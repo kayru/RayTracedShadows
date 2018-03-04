@@ -1,0 +1,9 @@
+.DS_Store
+Build
+build
+*.spv
+*.sublime-workspace
+/.vscode/*
+*.user
+.vs
+x64

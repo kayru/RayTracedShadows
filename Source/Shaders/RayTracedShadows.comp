@@ -1,0 +1,129 @@
+#version 450
+
+layout (binding = 0) uniform Constants
+{
+	vec4 cameraPosition;
+	vec4 cameraDirection;
+	vec4 lightDirection;
+	vec4 renderTargetSize;
+};
+
+layout(binding = 1) uniform sampler2D gbufferPositionSampler;
+layout(binding = 2, r8) uniform image2D outputShadowMask;
+
+ // unpacked node
+struct BVHNode
+{
+	vec4 bboxMin;
+	vec4 bboxMax;
+};
+
+// packed nodes, followed by vertex array (one per triangle)
+layout (std140, binding = 3) buffer BVHBuffer
+{
+	vec4 bvhNodes[];
+};
+
+struct Ray
+{
+	vec4 o;
+	vec4 d;
+};
+
+struct Triangle
+{
+	vec3 v0;
+	vec3 e0;
+	vec3 e1;
+};
+
+bool intersectRayTri(Ray r, vec3 v0, vec3 e0, vec3 e1)
+{
+	const vec3 s1 = cross(r.d.xyz, e1);
+	const float  invd = 1.0 / (dot(s1, e0));
+	const vec3 d = r.o.xyz - v0;
+	const float  b1 = dot(d, s1) * invd;
+	const vec3 s2 = cross(d, e0);
+	const float  b2 = dot(r.d.xyz, s2) * invd;
+	const float temp = dot(e1, s2) * invd;
+
+	if (b1 < 0.0 || b1 > 1.0 || b2 < 0.0 || b1 + b2 > 1.0 || temp < 0.0 || temp > r.o.w)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+bool intersectRayBox(Ray r, vec3 invdir, vec3 pmin, vec3 pmax)
+{
+	const vec3 f = (pmax.xyz - r.o.xyz) * invdir;
+	const vec3 n = (pmin.xyz - r.o.xyz) * invdir;
+
+	const vec3 tmax = max(f, n);
+	const vec3 tmin = min(f, n);
+
+	const float t1 = min(tmax.x, min(tmax.y, tmax.z));
+	const float t0 = max(max(tmin.x, max(tmin.y, tmin.z)), 0.0f);
+
+	return t1 >= t0;
+}
+
+bool intersectAny(Ray ray)
+{
+	const vec3 invdir = 1.0 / ray.d.xyz;
+
+	uint nodeIndex = 0;
+
+	while(nodeIndex != 0xFFFFFFFF)
+	{
+		BVHNode node;
+		node.bboxMin = bvhNodes[nodeIndex*2+0];
+		node.bboxMax = bvhNodes[nodeIndex*2+1];
+
+		uint primitiveIndex = floatBitsToUint(node.bboxMin.w);
+
+		if (primitiveIndex != 0xFFFFFFFF) // leaf node
+		{
+			vec4 data2 = bvhNodes[primitiveIndex];
+			Triangle tri;
+			tri.e0 = node.bboxMin.xyz;
+			tri.e1 = node.bboxMax.xyz;
+			tri.v0 = data2.xyz;
+			if (intersectRayTri(ray, tri.v0, tri.e0, tri.e1))
+			{
+				return true;
+			}
+		}
+		else if (intersectRayBox(ray, invdir, node.bboxMin.xyz, node.bboxMax.xyz))
+		{
+			++nodeIndex;
+			continue;
+		}
+
+		nodeIndex = floatBitsToUint(node.bboxMax.w);
+	}
+
+	return false;
+}
+
+layout(local_size_x = 8, local_size_y = 8) in;
+void main()
+{
+	ivec2 pixelIndex = ivec2(gl_GlobalInvocationID.xy);
+
+	Ray ray;
+
+	vec3 direction = lightDirection.xyz;
+	vec3 origin = cameraPosition.xyz + texelFetch(gbufferPositionSampler, pixelIndex, 0).xyz;
+	origin += lightDirection.xyz * lightDirection.w;
+
+	ray.o = vec4(origin.x, origin.y, origin.z, 1e9);
+	ray.d = vec4(direction.x, direction.y, direction.z, 0.0);
+
+	int result = intersectAny(ray) ? 0 : 1;
+
+	imageStore(outputShadowMask, pixelIndex, ivec4(result));
+}

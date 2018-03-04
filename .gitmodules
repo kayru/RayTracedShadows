@@ -1,0 +1,3 @@
+[submodule "External/librush"]
+	path = External/librush
+	url = git@github.com:kayru/librush.git
