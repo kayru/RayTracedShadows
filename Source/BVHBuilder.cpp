@@ -88,6 +88,7 @@ u32 split(std::vector<TempNode>& nodes, u32 begin, u32 end, const Box3& nodeBoun
 
 		for (u32 axis = 0; axis < 3; ++axis)
 		{
+			// TODO: just sort into N buckets
 			std::sort(nodes.begin() + begin, nodes.begin() + end,
 				[&](const TempNode& a, const TempNode& b)
 			{
@@ -273,15 +274,13 @@ void BVHBuilder::build(const float* vertices, u32 stride, const u32* indices, u3
 
 		node.primArea = Triangle::calculateArea(v0, v1, v2);
 
-		if (node.primArea > 1e-4) // filter out degenerate prims
-		{
-			setBounds(node, box.m_min, box.m_max);
-			node.bboxCenter = box.center();
-			node.prim = primId;
-			node.left = BVHNode::InvalidMask;
-			node.right = BVHNode::InvalidMask;
-			tempNodes.push_back(node);
-		}
+		setBounds(node, box.m_min, box.m_max);
+
+		node.bboxCenter = box.center();
+		node.prim = primId;
+		node.left = BVHNode::InvalidMask;
+		node.right = BVHNode::InvalidMask;
+		tempNodes.push_back(node);
 	}
 
 	const u32 rootIndex = buildInternal(tempNodes, 0, (u32)tempNodes.size());
