@@ -458,7 +458,7 @@ void RayTracedShadowsApp::renderShadowMask()
 
 	RayTracingConstants constants;
 	constants.cameraDirection = Vec4(m_interpolatedCamera.getForward(), 0.0f);
-	constants.lightDirection = Vec4(m_lightCamera.getForward(), m_shadowRayBias);
+	constants.lightDirection = Vec4(m_lightCamera.getForward(), 0.0f);
 	constants.cameraPosition = Vec4(m_interpolatedCamera.getPosition(), 0.0f);
 	constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
 	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);

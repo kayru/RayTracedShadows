@@ -109,6 +109,20 @@ bool intersectAny(Ray ray)
 	return false;
 }
 
+float computeEpsilonForValue(float f, uint exponentDiff)
+{
+	uint u = floatBitsToUint(f);
+	uint exponent = bitfieldExtract(u, 23, 8);
+	exponent -= min(exponentDiff, exponent);
+	u = bitfieldInsert(u, exponent, 23, 8);
+	return uintBitsToFloat(u);
+}
+
+float max3(vec3 v)
+{
+	return max(max(v.x, v.y), v.z);
+}
+
 layout(local_size_x = 8, local_size_y = 8) in;
 void main()
 {
@@ -117,8 +131,15 @@ void main()
 	Ray ray;
 
 	vec3 direction = lightDirection.xyz;
-	vec3 origin = cameraPosition.xyz + texelFetch(gbufferPositionSampler, pixelIndex, 0).xyz;
-	origin += lightDirection.xyz * lightDirection.w;
+	vec3 cameraRelativePosition = texelFetch(gbufferPositionSampler, pixelIndex, 0).xyz;
+	vec3 origin = cameraPosition.xyz + cameraRelativePosition;
+
+	float shadowRayBias = max(
+		computeEpsilonForValue(max3(abs(origin)), 13),
+		computeEpsilonForValue(max3(abs(cameraRelativePosition)), 13));
+
+	// TODO: we should be pushing the ray away in the direction of the surface normal
+	origin += lightDirection.xyz * shadowRayBias;
 
 	ray.o = vec4(origin.x, origin.y, origin.z, 1e9);
 	ray.d = vec4(direction.x, direction.y, direction.z, 0.0);

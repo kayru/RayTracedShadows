@@ -149,7 +149,6 @@ private:
 	WindowEventListener m_windowEvents;
 
 	float m_cameraScale = 1.0f;
-	float m_shadowRayBias = 1e-3f;
 
 	GfxBufferRef m_bvhBuffer;
 
