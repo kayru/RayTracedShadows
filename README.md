@@ -58,5 +58,5 @@ Solution files written to `Build` directory in the root of the repository.
 This demo uses similar ideas to what is described in the following work:
 
 * [The Perfect BVH, Jacco Bikker, 2016](http://www.cs.uu.nl/docs/vakken/magr/2015-2016/slides/lecture%2003%20-%20the%20perfect%20BVH.pdf)
-* [Implementing a practical rendering system using GLSL, Toshiya Hachisuka, 2015](www.ci.i.u-tokyo.ac.jp/~hachisuka/tdf2015.pdf)
+* [Implementing a practical rendering system using GLSL, Toshiya Hachisuka, 2015](http://www.ci.i.u-tokyo.ac.jp/~hachisuka/tdf2015.pdf)
 * [AMD RadeonRays](https://github.com/GPUOpen-LibrariesAndSDKs/RadeonRays_SDK)
