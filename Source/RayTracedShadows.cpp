@@ -552,6 +552,17 @@ GfxRef<GfxTexture> RayTracedShadowsApp::loadTexture(const std::string& filename)
 	}
 }
 
+inline u64 hashFnv1a64(const void* message, size_t length, u64 state = 0xcbf29ce484222325)
+{
+	const u8* bytes = (const u8*)message;
+	for (size_t i = 0; i < length; ++i)
+	{
+		state ^= bytes[i];
+		state *= 0x100000001b3;
+	}
+	return state;
+}
+
 bool RayTracedShadowsApp::loadModel(const char* filename)
 {
 	Log::message("Loading model '%s'", filename);
@@ -583,7 +594,20 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 			material.albedoTexture = loadTexture(directory + objMaterial.diffuse_texname);
 		}
 
-		material.constantBuffer.takeover(Gfx_CreateBuffer(materialCbDesc, &constants));
+		{
+			u64 constantHash = hashFnv1a64(&constants, sizeof(constants));
+			auto it = m_materialConstantBuffers.find(constantHash);
+			if (it == m_materialConstantBuffers.end())
+			{
+				GfxBuffer cb = Gfx_CreateBuffer(materialCbDesc, &constants);
+				m_materialConstantBuffers[constantHash].retain(cb);
+				material.constantBuffer.retain(cb);
+			}
+			else
+			{
+				material.constantBuffer = it->second;
+			}
+		}
 
 		m_materials.push_back(material);
 	}

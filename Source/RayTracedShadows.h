@@ -116,6 +116,7 @@ private:
 	bool m_valid = false;
 
 	std::unordered_map<std::string, GfxTextureRef> m_textures;
+	std::unordered_map<u64, GfxRef<GfxBuffer>> m_materialConstantBuffers;
 
 	GfxTextureRef m_shadowMask;
 	GfxTextureRef m_gbufferDepth;
