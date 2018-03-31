@@ -100,7 +100,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		GfxShaderBindings bindings;
 		bindings.addConstantBuffer("Global", 0);
 		bindings.addConstantBuffer("Material", 1);
-		bindings.addSampler("albedoSampler", 0);
+		bindings.addCombinedSampler("albedoSampler", 0);
 		m_techniqueModel = Gfx_CreateTechnique(GfxTechniqueDesc(modelPS.get(), modelVS.get(), modelVF.get(), &bindings));
 	}
 
@@ -111,7 +111,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		GfxShaderBindings bindings;
 
 		bindings.addConstantBuffer("Constants", 0);
-		bindings.addSampler("gbufferPositionSampler", 0);
+		bindings.addCombinedSampler("gbufferPositionSampler", 0);
 		bindings.addStorageImage("outputShadowMask", 0);
 		bindings.addStorageBuffer("BVHBuffer", 0);
 		m_techniqueRayTracedShadows = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), &bindings));
@@ -130,21 +130,21 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 			GfxShaderBindings bindings;
 			bindings.addConstantBuffer("Constants", 0);
-			bindings.addSampler("gbufferBaseColorSampler", 0);
-			bindings.addSampler("gbufferNormalSampler", 0);
-			bindings.addSampler("shadowMaskSampler", 0);
+			bindings.addCombinedSampler("gbufferBaseColorSampler", 0);
+			bindings.addCombinedSampler("gbufferNormalSampler", 0);
+			bindings.addCombinedSampler("shadowMaskSampler", 0);
 
 			m_techniqueCombine = Gfx_CreateTechnique(GfxTechniqueDesc(ps.get(), vs.get(), vf.get(), &bindings));
 		}
 	}
 
 	{
-		GfxBufferDesc cbDesc(GfxBufferType::Constant, GfxBufferMode::Temporary, GfxFormat_Unknown, 1, sizeof(ModelConstants));
+		GfxBufferDesc cbDesc(GfxBufferFlags::TransientConstant, GfxFormat_Unknown, 1, sizeof(ModelConstants));
 		m_modelGlobalConstantBuffer.takeover(Gfx_CreateBuffer(cbDesc));
 	}
 
 	{
-		GfxBufferDesc cbDesc(GfxBufferType::Constant, GfxBufferMode::Temporary, GfxFormat_Unknown, 1, sizeof(RayTracingConstants));
+		GfxBufferDesc cbDesc(GfxBufferFlags::TransientConstant, GfxFormat_Unknown, 1, sizeof(RayTracingConstants));
 		m_rayTracingConstantBuffer.takeover(Gfx_CreateBuffer(cbDesc));
 	}
 
@@ -465,8 +465,8 @@ void RayTracedShadowsApp::renderShadowMask()
 
 	Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
 	Gfx_SetTexture(m_ctx, GfxStage::Compute, 0, m_gbufferPosition);
-	Gfx_SetStorageImage(m_ctx, GfxStage::Compute, 0, m_shadowMask);
-	Gfx_SetStorageBuffer(m_ctx, GfxStage::Compute, 0, m_bvhBuffer);
+	Gfx_SetStorageImage(m_ctx, 0, m_shadowMask);
+	Gfx_SetStorageBuffer(m_ctx, 0, m_bvhBuffer);
 	Gfx_SetTechnique(m_ctx, m_techniqueRayTracedShadows);
 
 	u32 w = divUp(desc.width, 8);
@@ -569,7 +569,7 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		return false;
 	}
 
-	const GfxBufferDesc materialCbDesc(GfxBufferType::Constant, GfxBufferMode::Static, GfxFormat_Unknown, 1, sizeof(MaterialConstants));
+	const GfxBufferDesc materialCbDesc(GfxBufferFlags::Constant, GfxFormat_Unknown, 1, sizeof(MaterialConstants));
 	for (auto& objMaterial : materials)
 	{
 		MaterialConstants constants;
@@ -700,10 +700,10 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		m_indexCount = (u32)indices.size();
 	}
 
-	GfxBufferDesc vbDesc(GfxBufferType::Vertex, GfxBufferMode::Static, GfxFormat_Unknown, m_vertexCount, sizeof(Vertex));
+	GfxBufferDesc vbDesc(GfxBufferFlags::Vertex, GfxFormat_Unknown, m_vertexCount, sizeof(Vertex));
 	m_vertexBuffer = Gfx_CreateBuffer(vbDesc, vertices.data());
 
-	GfxBufferDesc ibDesc(GfxBufferType::Index, GfxBufferMode::Static, GfxFormat_R32_Uint, m_indexCount, 4);
+	GfxBufferDesc ibDesc(GfxBufferFlags::Index, GfxFormat_R32_Uint, m_indexCount, 4);
 	m_indexBuffer = Gfx_CreateBuffer(ibDesc, indices.data());
 
 	Log::message("Building BVH");
@@ -717,8 +717,7 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 			(u32)indices.size() / 3);
 
 		GfxBufferDesc desc;
-		desc.type = GfxBufferType::Storage;
-		desc.mode = GfxBufferMode::Static;
+		desc.flags = GfxBufferFlags::Storage;
 		desc.format = GfxFormat_Unknown;
 		desc.stride = sizeof(bvhBuilder.m_packedNodes[0]);
 		desc.count = (u32)bvhBuilder.m_packedNodes.size();
