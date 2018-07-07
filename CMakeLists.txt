@@ -6,9 +6,10 @@ project(RayTracedShadows)
 set(RUSH_RENDER_API "VK" CACHE STRING "Force Vulkan renderer")
 
 find_program(GLSLC NAMES glslc PATHS
-    $ENV{VK_SDK_PATH}/Bin
-    $ENV{PATH}
-    "~/bin"
+	$ENV{VULKAN_SDK}/Bin
+	$ENV{VK_SDK_PATH}/Bin
+	$ENV{PATH}
+	"~/bin"
 )
 
 add_subdirectory("External")
