@@ -8,8 +8,9 @@ layout (binding = 0) uniform Constants
 	vec4 renderTargetSize;
 };
 
-layout(binding = 1) uniform sampler2D gbufferPositionSampler;
-layout(binding = 2, r8) uniform image2D outputShadowMask;
+layout(binding = 1) uniform sampler defaultSampler;
+layout(binding = 2) uniform texture2D gbufferPositionTexture;
+layout(binding = 3, r8) uniform image2D outputShadowMask;
 
  // unpacked node
 struct BVHNode
@@ -19,7 +20,7 @@ struct BVHNode
 };
 
 // packed nodes, followed by vertex array (one per triangle)
-layout (std140, binding = 3) buffer BVHBuffer
+layout (std140, binding = 4) buffer BVHBuffer
 {
 	vec4 bvhNodes[];
 };
@@ -131,7 +132,7 @@ void main()
 	Ray ray;
 
 	vec3 direction = lightDirection.xyz;
-	vec3 cameraRelativePosition = texelFetch(gbufferPositionSampler, pixelIndex, 0).xyz;
+	vec3 cameraRelativePosition = texelFetch(sampler2D(gbufferPositionTexture, defaultSampler), pixelIndex, 0).xyz;
 	vec3 origin = cameraPosition.xyz + cameraRelativePosition;
 
 	float shadowRayBias = max(

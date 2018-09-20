@@ -8,9 +8,10 @@ layout (binding = 0) uniform Constants
 	vec4 renderTargetSize;
 };
 
-layout (binding = 1) uniform sampler2D gbufferBaseColorSampler;
-layout (binding = 2) uniform sampler2D gbufferNormalSampler;
-layout (binding = 3) uniform sampler2D shadowMaskSampler;
+layout (binding = 1) uniform sampler defaultSampler;
+layout (binding = 2) uniform texture2D gbufferBaseColorTexture;
+layout (binding = 3) uniform texture2D gbufferNormalTexture;
+layout (binding = 4) uniform texture2D shadowMaskTexture;
 
 layout (location = 0) out vec4 fragColor;
 
@@ -18,9 +19,9 @@ void main()
 {
 	vec2 texcoord = gl_FragCoord.xy * renderTargetSize.zw;
 
-	vec3 worldNormal = texture(gbufferNormalSampler, texcoord).xyz;
-	vec3 baseColor = texture(gbufferBaseColorSampler, texcoord).xyz;
-	float shadowMask = texture(shadowMaskSampler, texcoord).x;
+	vec3 worldNormal = texture(sampler2D(gbufferNormalTexture, defaultSampler), texcoord).xyz;
+	vec3 baseColor = texture(sampler2D(gbufferBaseColorTexture, defaultSampler), texcoord).xyz;
+	float shadowMask = texture(sampler2D(shadowMaskTexture, defaultSampler), texcoord).x;
 
 	vec4 result;
 

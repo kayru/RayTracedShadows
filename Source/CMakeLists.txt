@@ -29,14 +29,39 @@ add_executable(${app}
 
 source_group("Shaders" FILES ${shaders} ${shaderDependencies})
 
-function(shader_compile_rule shaderName dependencies)
-    add_custom_command(
-        OUTPUT ${CMAKE_CFG_INTDIR}/${shaderName}.spv
-        COMMAND ${GLSLC} -o ${CMAKE_CFG_INTDIR}/${shaderName}.spv ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
-        MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
-        DEPENDS ${dependencies}
-    )
-endfunction(shader_compile_rule)
+find_program(GLSLC NAMES glslc PATHS
+	$ENV{VULKAN_SDK}/Bin
+	$ENV{VK_SDK_PATH}/Bin
+	$ENV{PATH}
+	"~/bin"
+)
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	find_program(spirv-cross NAMES spirv-cross PATHS
+		$ENV{VK_SDK_PATH}/Bin
+		$ENV{PATH}
+		"~/bin"
+	)
+	function(shader_compile_rule shaderName dependencies)
+		add_custom_command(
+			OUTPUT ${CMAKE_CFG_INTDIR}/${shaderName}.metal
+			COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CFG_INTDIR}/Shaders
+			COMMAND ${GLSLC} -o ${CMAKE_CFG_INTDIR}/${shaderName}.spv ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
+			COMMAND ${spirv-cross} --metal ${CMAKE_CFG_INTDIR}/${shaderName}.spv > ${CMAKE_CFG_INTDIR}/${shaderName}.metal
+			MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
+			DEPENDS ${dependencies}
+		)
+	endfunction(shader_compile_rule)
+else()
+	function(shader_compile_rule shaderName dependencies)
+		add_custom_command(
+			OUTPUT ${CMAKE_CFG_INTDIR}/${shaderName}.spv
+			COMMAND ${GLSLC} -o ${CMAKE_CFG_INTDIR}/${shaderName}.spv ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
+			MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
+			DEPENDS ${dependencies}
+		)
+	endfunction(shader_compile_rule)
+endif()
 
 foreach(shader ${shaders})
 	shader_compile_rule(${shader} "${shaderDependencies}")

@@ -13,6 +13,16 @@
 
 AppConfig g_appConfig;
 
+#ifdef __GNUC__
+#define sprintf_s sprintf
+#endif
+
+#if RUSH_RENDER_API == RUSH_RENDER_API_MTL
+#define MAKE_SHADER_NAME(x) x ".metal"
+#else
+#define MAKE_SHADER_NAME(x) x ".spv"
+#endif
+
 int main(int argc, char** argv)
 {
 	g_appConfig.name = "RayTracedShadows (" RUSH_RENDER_API_NAME ")";
@@ -25,6 +35,7 @@ int main(int argc, char** argv)
 
 #ifndef NDEBUG
 	g_appConfig.debug = true;
+	Log::breakOnError = true;
 #endif
 
 	return Platform_Main<RayTracedShadowsApp>(g_appConfig);
@@ -59,18 +70,26 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	createRenderTargets(m_window->getSize());
 
 	const char* shaderDirectory = Platform_GetExecutableDirectory();
-	auto shaderFromFile = [&](const char* filename, GfxShaderType type) {
+	auto shaderFromFile = [&](const char* filename, GfxShaderType type)
+	{
 		std::string fullFilename = std::string(shaderDirectory) + "/" + std::string(filename);
 		Log::message("Loading shader '%s'", filename);
 
 		GfxShaderSource source;
+
+#if RUSH_RENDER_API == RUSH_RENDER_API_MTL
+		source.type = GfxShaderSourceType_MSL;
+		bool isText = true;
+#else
 		source.type = GfxShaderSourceType_SPV;
+		bool isText = false;
+#endif
 
 		FileIn f(fullFilename.c_str());
 		if (f.valid())
 		{
 			u32 fileSize = f.length();
-			source.resize(fileSize);
+			source.resize(fileSize + (isText ? 1 : 0), 0);
 			f.read(&source[0], fileSize);
 		}
 
@@ -84,10 +103,10 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 	{
 		GfxVertexShaderRef modelVS;
-		modelVS.takeover(Gfx_CreateVertexShader(shaderFromFile("Shaders/Model.vert.spv", GfxShaderType::Vertex)));
+		modelVS.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.vert"), GfxShaderType::Vertex)));
 
 		GfxPixelShaderRef modelPS;
-		modelPS.takeover(Gfx_CreatePixelShader(shaderFromFile("Shaders/Model.frag.spv", GfxShaderType::Pixel)));
+		modelPS.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.frag"), GfxShaderType::Pixel)));
 
 		GfxVertexFormatDesc modelVFDesc;
 		modelVFDesc.add(0, GfxVertexFormatDesc::DataType::Float3, GfxVertexFormatDesc::Semantic::Position, 0);
@@ -97,24 +116,24 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		GfxVertexFormatRef modelVF;
 		modelVF.takeover(Gfx_CreateVertexFormat(modelVFDesc));
 
-		GfxShaderBindings bindings;
-		bindings.addConstantBuffer("Global", 0);
-		bindings.addConstantBuffer("Material", 1);
-		bindings.addCombinedSampler("albedoSampler", 0);
-		m_techniqueModel = Gfx_CreateTechnique(GfxTechniqueDesc(modelPS.get(), modelVS.get(), modelVF.get(), &bindings));
+		GfxShaderBindingDesc bindings;
+		bindings.constantBuffers = 2;
+		bindings.samplers = 1;
+		bindings.textures = 1;
+		m_techniqueModel = Gfx_CreateTechnique(GfxTechniqueDesc(modelPS.get(), modelVS.get(), modelVF.get(), bindings));
 	}
 
 	{
 		GfxComputeShaderRef cs;
-		cs.takeover(Gfx_CreateComputeShader(shaderFromFile("Shaders/RayTracedShadows.comp.spv", GfxShaderType::Compute)));
+		cs.takeover(Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.comp"), GfxShaderType::Compute)));
 
-		GfxShaderBindings bindings;
-
-		bindings.addConstantBuffer("Constants", 0);
-		bindings.addCombinedSampler("gbufferPositionSampler", 0);
-		bindings.addStorageImage("outputShadowMask", 0);
-		bindings.addStorageBuffer("BVHBuffer", 0);
-		m_techniqueRayTracedShadows = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), &bindings));
+		GfxShaderBindingDesc bindings;
+		bindings.constantBuffers = 1;
+		bindings.samplers = 1;
+		bindings.textures = 1;
+		bindings.rwImages = 1;
+		bindings.rwBuffers = 1;
+		m_techniqueRayTracedShadows = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), bindings));
 	}
 
 	{
@@ -122,19 +141,17 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		vf.takeover(Gfx_CreateVertexFormat(GfxVertexFormatDesc()));
 
 		GfxVertexShaderRef vs;
-		vs.takeover(Gfx_CreateVertexShader(shaderFromFile("Shaders/Blit.vert.spv", GfxShaderType::Vertex)));
+		vs.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Blit.vert"), GfxShaderType::Vertex)));
 
 		{
 			GfxPixelShaderRef ps;
-			ps.takeover(Gfx_CreatePixelShader(shaderFromFile("Shaders/Combine.frag.spv", GfxShaderType::Pixel)));
+			ps.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Combine.frag"), GfxShaderType::Pixel)));
 
-			GfxShaderBindings bindings;
-			bindings.addConstantBuffer("Constants", 0);
-			bindings.addCombinedSampler("gbufferBaseColorSampler", 0);
-			bindings.addCombinedSampler("gbufferNormalSampler", 0);
-			bindings.addCombinedSampler("shadowMaskSampler", 0);
-
-			m_techniqueCombine = Gfx_CreateTechnique(GfxTechniqueDesc(ps.get(), vs.get(), vf.get(), &bindings));
+			GfxShaderBindingDesc bindings;
+			bindings.constantBuffers = 1;
+			bindings.samplers = 1;
+			bindings.textures = 3;
+			m_techniqueCombine = Gfx_CreateTechnique(GfxTechniqueDesc(ps.get(), vs.get(), vf.get(), bindings));
 		}
 	}
 
@@ -154,14 +171,14 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		m_statusString = std::string("Model: ") + modelFilename;
 		m_valid = loadModel(modelFilename);
 
-		Vec3 center = m_boundingBox.center();
 		Vec3 dimensions = m_boundingBox.dimensions();
 		float longestSide = dimensions.reduceMax();
 
 		if (longestSide != 0)
 		{
 			m_cameraScale = longestSide / 100.0f;
-			// float scale = 100.0f / longestSide;
+			//Vec3 center = m_boundingBox.center();
+			//float scale = 100.0f / longestSide;
 			//m_worldTransform = Mat4::scaleTranslate(scale, -center*scale);
 			//m_cameraMan.setMoveSpeed();
 		}
@@ -343,9 +360,10 @@ void RayTracedShadowsApp::render()
 		Gfx_SetDepthStencilState(m_ctx, m_depthStencilStates.disable);
 		Gfx_SetBlendState(m_ctx, m_blendStates.opaque);
 		Gfx_SetTechnique(m_ctx, m_techniqueCombine);
-		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 0, m_gbufferBaseColor, m_samplerStates.pointClamp);
-		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 1, m_gbufferNormal, m_samplerStates.pointClamp);
-		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 2, m_shadowMask, m_samplerStates.pointClamp);
+		Gfx_SetSampler(m_ctx, GfxStage::Pixel, 0, m_samplerStates.pointClamp);
+		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 0, m_gbufferBaseColor);
+		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 1, m_gbufferNormal);
+		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 2, m_shadowMask);
 		Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
 		Gfx_Draw(m_ctx, 0, 3);
 	}
@@ -441,7 +459,8 @@ void RayTracedShadowsApp::renderGbuffer()
 			}
 			Gfx_SetConstantBuffer(m_ctx, 1, material.constantBuffer);
 
-			Gfx_SetTexture(m_ctx, GfxStage::Pixel, 0, texture, m_samplerStates.anisotropicWrap);
+			Gfx_SetSampler(m_ctx, GfxStage::Pixel, 0, m_samplerStates.anisotropicWrap);
+			Gfx_SetTexture(m_ctx, GfxStage::Pixel, 0, texture);
 			Gfx_DrawIndexed(m_ctx, segment.indexCount, segment.indexOffset, 0, m_vertexCount);
 		}
 	}
@@ -464,6 +483,7 @@ void RayTracedShadowsApp::renderShadowMask()
 	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);
 
 	Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
+	Gfx_SetSampler(m_ctx, GfxStage::Compute, 0, m_samplerStates.pointClamp);
 	Gfx_SetTexture(m_ctx, GfxStage::Compute, 0, m_gbufferPosition);
 	Gfx_SetStorageImage(m_ctx, 0, m_shadowMask);
 	Gfx_SetStorageBuffer(m_ctx, 0, m_bvhBuffer);
@@ -509,7 +529,12 @@ GfxRef<GfxTexture> RayTracedShadowsApp::loadTexture(const std::string& filename)
 
 			std::vector<GfxTextureData> textureData;
 			textureData.reserve(16);
-			textureData.push_back(GfxTextureData(pixels));
+
+			{
+				GfxTextureData item;
+				item.pixels = pixels;
+				textureData.push_back(item);
+			}
 
 			u32 mipWidth = w;
 			u32 mipHeight = h;
@@ -529,7 +554,12 @@ GfxRef<GfxTexture> RayTracedShadowsApp::loadTexture(const std::string& filename)
 					nextMip, nextMipWidth, nextMipHeight, nextMipPitch, 4);
 				RUSH_ASSERT(resizeResult);
 
-				textureData.push_back(GfxTextureData(nextMip, (u32)textureData.size()));
+				{
+					GfxTextureData item;
+					item.pixels = nextMip;
+					item.mip = (u32)textureData.size();
+					textureData.push_back(item);					
+				}
 
 				mipWidth = nextMipWidth;
 				mipHeight = nextMipHeight;
