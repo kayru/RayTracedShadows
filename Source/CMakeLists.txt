@@ -67,6 +67,16 @@ foreach(shader ${shaders})
 	shader_compile_rule(${shader} "${shaderDependencies}")
 endforeach()
 
+if (${RUSH_RENDER_API} MATCHES "VK")
+	target_compile_definitions(${app} PRIVATE
+		USE_NVX_RAYTRACING=1
+	)
+	target_sources(${app} PRIVATE
+		NVXRaytracing.h
+		NVXRaytracing.cpp
+	)
+endif()
+
 target_compile_definitions(${app} PRIVATE
 	RUSH_USING_NAMESPACE # Automatically use Rush namespace
 )

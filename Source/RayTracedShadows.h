@@ -20,6 +20,8 @@
 #include "BVHBuilder.h"
 #include "MovingAverage.h"
 
+class NVXRaytracing;
+
 class RayTracedShadowsApp : public BaseApplication
 {
 public:
@@ -154,5 +156,7 @@ private:
 	GfxBufferRef m_bvhBuffer;
 
 	Vec2 m_prevMousePos = Vec2(0.0f);
+
+	NVXRaytracing* m_nvxRaytracing = nullptr;
 
 };

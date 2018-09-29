@@ -1,4 +1,9 @@
 #include "RayTracedShadows.h"
+
+#if USE_NVX_RAYTRACING
+#include "NVXRaytracing.h"
+#endif // USE_NVX_RAYTRACING
+
 #include <Rush/UtilFile.h>
 #include <Rush/UtilLog.h>
 #include <Rush/MathTypes.h>
@@ -34,7 +39,9 @@ int main(int argc, char** argv)
 	g_appConfig.resizable = true;
 
 #ifndef NDEBUG
+	#if !USE_NVX_RAYTRACING // debug layers are not compatible with raytracing extension
 	g_appConfig.debug = true;
+	#endif
 	Log::breakOnError = true;
 #endif
 
@@ -61,6 +68,15 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 {
 	Gfx_SetPresentInterval(1);
 
+	const GfxCapability& caps = Gfx_GetCapability();
+	
+#if USE_NVX_RAYTRACING
+	if (caps.raytracing)
+	{
+		m_nvxRaytracing = new NVXRaytracing();
+	}
+#endif // USE_NVX_RAYTRACING
+
 	m_windowEvents.setOwner(m_window);
 
 	const u32 whiteTexturePixels[4] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };
@@ -70,7 +86,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	createRenderTargets(m_window->getSize());
 
 	const char* shaderDirectory = Platform_GetExecutableDirectory();
-	auto shaderFromFile = [&](const char* filename, GfxShaderType type)
+	auto shaderFromFile = [shaderDirectory](const char* filename, GfxShaderType type)
 	{
 		std::string fullFilename = std::string(shaderDirectory) + "/" + std::string(filename);
 		Log::message("Loading shader '%s'", filename);
@@ -205,6 +221,8 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 RayTracedShadowsApp::~RayTracedShadowsApp()
 {
+	delete m_nvxRaytracing;
+
 	m_windowEvents.setOwner(nullptr);
 
 	Gfx_Release(m_defaultWhiteTexture);
@@ -761,6 +779,16 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 	m_indexBuffer = Gfx_CreateBuffer(ibDesc, indices.data());
 
 	Log::message("Building BVH");
+
+#if USE_NVX_RAYTRACING
+	if (m_nvxRaytracing)
+	{
+		GfxContext* ctx = Platform_GetGfxContext();
+		m_nvxRaytracing->build(ctx,
+			m_vertexBuffer, m_vertexCount, GfxFormat_RGB32_Float, u32(sizeof(Vertex)),
+			m_indexBuffer, m_indexCount, GfxFormat_R32_Uint);
+	}
+#endif
 
 	{
 		BVHBuilder bvhBuilder;
