@@ -86,7 +86,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	createRenderTargets(m_window->getSize());
 
 	const char* shaderDirectory = Platform_GetExecutableDirectory();
-	auto shaderFromFile = [shaderDirectory](const char* filename, GfxShaderType type)
+	auto shaderFromFile = [shaderDirectory](const char* filename)
 	{
 		std::string fullFilename = std::string(shaderDirectory) + "/" + std::string(filename);
 		Log::message("Loading shader '%s'", filename);
@@ -119,10 +119,10 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 	{
 		GfxVertexShaderRef modelVS;
-		modelVS.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.vert"), GfxShaderType::Vertex)));
+		modelVS.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.vert"))));
 
 		GfxPixelShaderRef modelPS;
-		modelPS.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.frag"), GfxShaderType::Pixel)));
+		modelPS.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.frag"))));
 
 		GfxVertexFormatDesc modelVFDesc;
 		modelVFDesc.add(0, GfxVertexFormatDesc::DataType::Float3, GfxVertexFormatDesc::Semantic::Position, 0);
@@ -141,7 +141,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 	{
 		GfxComputeShaderRef cs;
-		cs.takeover(Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.comp"), GfxShaderType::Compute)));
+		cs.takeover(Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.comp"))));
 
 		GfxShaderBindingDesc bindings;
 		bindings.constantBuffers = 1;
@@ -157,11 +157,11 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		vf.takeover(Gfx_CreateVertexFormat(GfxVertexFormatDesc()));
 
 		GfxVertexShaderRef vs;
-		vs.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Blit.vert"), GfxShaderType::Vertex)));
+		vs.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Blit.vert"))));
 
 		{
 			GfxPixelShaderRef ps;
-			ps.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Combine.frag"), GfxShaderType::Pixel)));
+			ps.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Combine.frag"))));
 
 			GfxShaderBindingDesc bindings;
 			bindings.constantBuffers = 1;
@@ -170,6 +170,16 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 			m_techniqueCombine = Gfx_CreateTechnique(GfxTechniqueDesc(ps.get(), vs.get(), vf.get(), bindings));
 		}
 	}
+
+#if USE_NVX_RAYTRACING
+	if (m_nvxRaytracing)
+	{
+		GfxShaderSource rgen = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsNVX.rgen"));
+		GfxShaderSource rmiss = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsNVX.rmiss"));
+
+		m_nvxRaytracing->createPipeline(rgen, rmiss);
+	}
+#endif
 
 	{
 		GfxBufferDesc cbDesc(GfxBufferFlags::TransientConstant, GfxFormat_Unknown, 1, sizeof(ModelConstants));
@@ -359,7 +369,8 @@ void RayTracedShadowsApp::render()
 	if (m_valid)
 	{
 		renderGbuffer();
-		renderShadowMask();
+		//renderShadowMask();
+		renderShadowMaskNVX();
 	}
 
 	Gfx_AddImageBarrier(m_ctx, m_gbufferBaseColor, GfxResourceState_ShaderRead);
@@ -510,6 +521,29 @@ void RayTracedShadowsApp::renderShadowMask()
 	u32 w = divUp(desc.width, 8);
 	u32 h = divUp(desc.height, 8);
 	Gfx_Dispatch(m_ctx, w, h, 1);
+
+	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
+}
+
+void RayTracedShadowsApp::renderShadowMaskNVX()
+{
+	Gfx_BeginTimer(m_ctx, Timestamp_Shadows);
+
+	const GfxTextureDesc& desc = Gfx_GetTextureDesc(m_shadowMask);
+
+	RayTracingConstants constants;
+	constants.cameraDirection = Vec4(m_interpolatedCamera.getForward(), 0.0f);
+	constants.lightDirection = Vec4(m_lightCamera.getForward(), 0.0f);
+	constants.cameraPosition = Vec4(m_interpolatedCamera.getPosition(), 0.0f);
+	constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
+	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);
+
+	m_nvxRaytracing->dispatch(m_ctx, 
+		desc.width, desc.height,
+		m_rayTracingConstantBuffer.get(),
+		m_samplerStates.pointClamp.get(),
+		m_gbufferPosition.get(),
+		m_shadowMask.get());
 
 	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
 }

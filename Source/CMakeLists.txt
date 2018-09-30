@@ -10,6 +10,13 @@ set(shaders
 	Shaders/RayTracedShadows.comp
 )
 
+if (${RUSH_RENDER_API} MATCHES "VK")
+	set(shaders ${shaders}
+		Shaders/RayTracedShadowsNVX.rgen
+		Shaders/RayTracedShadowsNVX.rmiss
+	)
+endif()
+
 set(src
 	${shaders}
 	BaseApplication.cpp

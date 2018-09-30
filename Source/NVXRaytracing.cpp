@@ -1,5 +1,6 @@
 #include "NVXRaytracing.h"
 #include <Rush/MathCommon.h>
+#include <Rush/UtilStaticArray.h>
 
 #define V(x)                                                                                                           \
 	{                                                                                                                  \
@@ -7,6 +8,137 @@
 		RUSH_UNUSED(s);                                                                                                \
 		RUSH_ASSERT_MSG(s == VK_SUCCESS, #x " call failed");                                                           \
 	}
+
+void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss)
+{
+	GfxDevice* device = Platform_GetGfxDevice();
+	VkDevice vulkanDevice = device->m_vulkanDevice;
+
+	{
+		VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+		moduleCreateInfo.codeSize = rgen.size();
+		moduleCreateInfo.pCode = (const u32*)rgen.data();
+		V(vkCreateShaderModule(vulkanDevice, &moduleCreateInfo, nullptr, &m_rayGenShader));
+	}
+
+	{
+		VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+		moduleCreateInfo.codeSize = rmiss.size();
+		moduleCreateInfo.pCode = (const u32*)rmiss.data();
+		V(vkCreateShaderModule(vulkanDevice, &moduleCreateInfo, nullptr, &m_rayMissShader));
+	}
+
+	// create descriptor set layout
+
+	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+
+	StaticArray<VkDescriptorSetLayoutBinding, 5> bindings; // TODO: configurable bindings based on GfxShaderBindingDesc
+
+	{
+		VkDescriptorSetLayoutBinding item = {};
+		item.binding = 0;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		bindings.pushBack(item);
+	}
+
+	{
+		VkDescriptorSetLayoutBinding item = {};
+		item.binding = 1;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		bindings.pushBack(item);
+	}
+
+	{
+		VkDescriptorSetLayoutBinding item = {};
+		item.binding = 2;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		bindings.pushBack(item);
+	}
+
+	{
+		VkDescriptorSetLayoutBinding item = {};
+		item.binding = 3;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		bindings.pushBack(item);
+	}
+
+	{
+		VkDescriptorSetLayoutBinding item = {};
+		item.binding = 4;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		bindings.pushBack(item);
+	}
+
+	descriptorSetLayoutCreateInfo.bindingCount = u32(bindings.currentSize);
+	descriptorSetLayoutCreateInfo.pBindings = bindings.data;
+	V(vkCreateDescriptorSetLayout(vulkanDevice, &descriptorSetLayoutCreateInfo, nullptr, &m_descriptorSetLayout));
+
+	// create pipeline layout
+
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+	pipelineLayoutCreateInfo.setLayoutCount = 1;
+	pipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
+
+	V(vkCreatePipelineLayout(vulkanDevice, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));
+
+	// create pipeline
+
+	VkRaytracingPipelineCreateInfoNVX createInfo = { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
+
+	VkPipelineShaderStageCreateInfo shaderStages[2] = {};
+
+	shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+	shaderStages[0].module = m_rayGenShader;
+	shaderStages[0].pName = "main";
+
+	shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStages[1].stage = VK_SHADER_STAGE_MISS_BIT_NVX;
+	shaderStages[1].module = m_rayMissShader;
+	shaderStages[1].pName = "main";
+
+	createInfo.stageCount = 2;
+	createInfo.pStages = shaderStages;
+
+	u32 groupNumbers[2] = { 0, 1 };
+	createInfo.pGroupNumbers = groupNumbers;
+	createInfo.maxRecursionDepth = 1;
+
+	createInfo.layout = m_pipelineLayout;
+
+	V(vkCreateRaytracingPipelinesNVX(vulkanDevice, 
+		device->m_pipelineCache,
+		1, &createInfo, nullptr, &m_pipeline));
+
+	m_shaderHandleSize = device->m_nvxRaytracingProps.shaderHeaderSize;
+	m_shaderHandles.resize(m_shaderHandleSize * 2);
+
+	vkGetRaytracingShaderHandlesNVX(vulkanDevice, m_pipeline,
+		0, 2, m_shaderHandleSize, m_shaderHandles.data());
+
+	m_sbtMissStride = m_shaderHandleSize;
+	m_sbtHitStride = m_shaderHandleSize;
+
+	m_sbtRaygenOffset = 0 * m_shaderHandleSize;
+	m_sbtMissOffset = 1 * m_shaderHandleSize;
+
+	GfxBufferDesc instanceBufferDesc;
+	instanceBufferDesc.flags = GfxBufferFlags::None;
+	instanceBufferDesc.count = 2;
+	instanceBufferDesc.stride = m_shaderHandleSize;
+
+	m_sbtBuffer = Gfx_CreateBuffer(instanceBufferDesc, m_shaderHandles.data());
+}
 
 void NVXRaytracing::build(GfxContext * ctx,
 	GfxBuffer vertexBuffer, u32 vertexCount, GfxFormat positionFormat, u32 vertexStride,
@@ -167,12 +299,139 @@ void NVXRaytracing::build(GfxContext * ctx,
 	Gfx_vkFullPipelineBarrier(ctx);
 }
 
+void NVXRaytracing::dispatch(GfxContext* ctx,
+	u32 width, u32 height,
+	GfxBuffer constants,
+	GfxSampler pointSampler,
+	GfxTexture positionTexture,
+	GfxTexture outputShadowMask)
+{
+	ctx->flushBarriers();
+
+	GfxDevice* device = Platform_GetGfxDevice();
+	VkDevice vulkanDevice = device->m_vulkanDevice;
+
+	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+	allocInfo.descriptorPool = device->m_currentFrame->descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &m_descriptorSetLayout;
+
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+	V(vkAllocateDescriptorSets(vulkanDevice, &allocInfo, &descriptorSet));
+
+	StaticArray<VkWriteDescriptorSet, 5> descriptors;
+
+	{
+		VkWriteDescriptorSet item = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		item.dstSet = descriptorSet;
+		item.dstBinding = 0;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		item.pBufferInfo = &device->m_buffers[constants].info;
+		descriptors.pushBack(item);
+	}
+
+	VkDescriptorImageInfo samplerInfo = {};
+	samplerInfo.sampler = device->m_samplers[pointSampler].native;
+
+	{
+		
+		VkWriteDescriptorSet item = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		item.dstSet = descriptorSet;
+		item.dstBinding = 1;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		item.pImageInfo = &samplerInfo;
+		descriptors.pushBack(item);
+	}
+
+	VkDescriptorImageInfo positionImageInfo = {};
+	positionImageInfo.imageView = device->m_textures[positionTexture].imageView;
+	positionImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	{
+
+		VkWriteDescriptorSet item = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		item.dstSet = descriptorSet;
+		item.dstBinding = 2;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		item.pImageInfo = &positionImageInfo;
+		descriptors.pushBack(item);
+	}
+
+	VkDescriptorImageInfo outputImageInfo = {};
+	outputImageInfo.imageView = device->m_textures[positionTexture].imageView;
+	outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	{
+
+		VkWriteDescriptorSet item = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		item.dstSet = descriptorSet;
+		item.dstBinding = 3;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		item.pImageInfo = &outputImageInfo;
+		descriptors.pushBack(item);
+	}
+
+	VkDescriptorAccelerationStructureInfoNVX tlasInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
+	tlasInfo.accelerationStructureCount = 1;
+	tlasInfo.pAccelerationStructures = &m_tlas;
+
+	{
+
+		VkWriteDescriptorSet item = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		item.dstSet = descriptorSet;
+		item.dstBinding = 4;
+		item.descriptorCount = 1;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+		item.pNext = &tlasInfo;
+		descriptors.pushBack(item);
+	}
+
+	vkUpdateDescriptorSets(vulkanDevice,
+		u32(descriptors.currentSize),
+		descriptors.data, 
+		0, nullptr);
+
+	vkCmdBindPipeline(ctx->m_commandBuffer,
+		VK_PIPELINE_BIND_POINT_RAYTRACING_NVX,
+		m_pipeline);
+
+	vkCmdBindDescriptorSets(ctx->m_commandBuffer,
+		VK_PIPELINE_BIND_POINT_RAYTRACING_NVX,
+		m_pipelineLayout, 0, 1, &descriptorSet,
+		0, nullptr);
+
+	const BufferVK& sbtBufferVK = device->m_buffers[m_sbtBuffer];
+	VkBuffer sbtBuffer = sbtBufferVK.info.buffer;
+
+	vkCmdTraceRaysNVX(ctx->m_commandBuffer,
+		sbtBuffer, sbtBufferVK.info.offset + m_sbtRaygenOffset,
+		sbtBuffer, sbtBufferVK.info.offset + m_sbtMissOffset, m_sbtMissStride,
+		sbtBuffer, sbtBufferVK.info.offset + m_sbtHitOffset, m_sbtHitStride,
+		width, height);
+
+	ctx->m_dirtyState |= GfxContext::DirtyStateFlag_Pipeline;
+}
+
 void NVXRaytracing::reset()
 {
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
 
+	Gfx_DestroyBuffer(m_sbtBuffer);
+
 	// TODO: Enqueue destruction
+
+	vkDestroyShaderModule(vulkanDevice, m_rayGenShader, nullptr);
+	vkDestroyShaderModule(vulkanDevice, m_rayMissShader, nullptr);
+
+	vkDestroyDescriptorSetLayout(vulkanDevice, m_descriptorSetLayout, nullptr);
+	vkDestroyPipelineLayout(vulkanDevice, m_pipelineLayout, nullptr);
+
+	vkDestroyPipeline(vulkanDevice, m_pipeline, nullptr);
 
 	vkFreeMemory(vulkanDevice, m_memory, nullptr);
 	vkFreeMemory(vulkanDevice, m_scratchMemory, nullptr);

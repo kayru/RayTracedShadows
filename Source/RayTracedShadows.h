@@ -55,6 +55,7 @@ private:
 	};
 
 	void renderShadowMask();
+	void renderShadowMaskNVX();
 
 	bool loadModel(const char* filename);
 	GfxRef<GfxTexture> loadTexture(const std::string& filename);
