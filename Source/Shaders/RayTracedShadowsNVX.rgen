@@ -1,6 +1,14 @@
 #version 460
 #extension GL_NVX_raytracing : enable
 
+#if 1
+
+void main()
+{
+}
+
+#else
+
 layout (binding = 0) uniform Constants
 {
 	vec4 cameraPosition;
@@ -44,7 +52,7 @@ void main()
 		computeEpsilonForValue(max3(abs(origin)), 13),
 		computeEpsilonForValue(max3(abs(cameraRelativePosition)), 13));
 
-	uint rayFlags = 0;//gl_RayFlagsOpaqueNVX | gl_RayFlagsTerminateOnFirstHitNVX | gl_RayFlagsSkipClosestHitShaderNVX;
+	uint rayFlags = gl_RayFlagsOpaqueNVX | gl_RayFlagsTerminateOnFirstHitNVX | gl_RayFlagsSkipClosestHitShaderNVX;
 
 	payload = 1; // this will be set to 0 by miss shader
 
@@ -64,3 +72,5 @@ void main()
 	ivec4 result = ivec4(payload);
 	imageStore(outputShadowMask, pixelIndex, result);
 }
+
+#endif
