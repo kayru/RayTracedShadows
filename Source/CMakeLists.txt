@@ -36,7 +36,7 @@ add_executable(${app}
 
 source_group("Shaders" FILES ${shaders} ${shaderDependencies})
 
-find_program(GLSLC NAMES glslc PATHS
+find_program(GLSLC NAMES glslc NO_SYSTEM_ENVIRONMENT_PATH PATHS
 	"../Tools"
 	$ENV{VULKAN_SDK}/Bin
 	$ENV{VK_SDK_PATH}/Bin
