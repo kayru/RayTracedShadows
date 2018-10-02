@@ -5,5 +5,5 @@ layout(location = 0) rayPayloadNVX uint payload;
 
 void main()
 {
-	payload = 0;
+	payload = 1;
 }
