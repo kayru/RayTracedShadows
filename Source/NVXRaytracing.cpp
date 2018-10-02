@@ -124,7 +124,7 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 	m_shaderHandles.resize(m_shaderHandleSize * 2);
 
 	vkGetRaytracingShaderHandlesNVX(vulkanDevice, m_pipeline,
-		0, 2, m_shaderHandleSize, m_shaderHandles.data());
+		0, 2, u32(m_shaderHandles.size()), m_shaderHandles.data());
 
 	m_sbtMissStride = m_shaderHandleSize;
 	m_sbtHitStride = m_shaderHandleSize;
