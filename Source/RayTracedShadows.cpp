@@ -39,9 +39,7 @@ int main(int argc, char** argv)
 	g_appConfig.resizable = true;
 
 #ifndef NDEBUG
-	#if !USE_NVX_RAYTRACING // debug layers are not compatible with raytracing extension
 	g_appConfig.debug = true;
-	#endif
 	Log::breakOnError = true;
 #endif
 
@@ -366,6 +364,16 @@ void RayTracedShadowsApp::createRenderTargets(Tuple2i size)
 
 void RayTracedShadowsApp::render()
 {
+#if USE_NVX_RAYTRACING
+	if (m_nvxRaytracingDirty && m_nvxRaytracing)
+	{
+		m_nvxRaytracing->build(m_ctx,
+			m_vertexBuffer, m_vertexCount, GfxFormat_RGB32_Float, u32(sizeof(Vertex)),
+			m_indexBuffer, m_indexCount, GfxFormat_R32_Uint);
+		m_nvxRaytracingDirty = false;
+	}
+#endif
+
 	if (m_valid)
 	{
 		renderGbuffer();
@@ -814,16 +822,6 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 
 	Log::message("Building BVH");
 
-#if USE_NVX_RAYTRACING
-	if (m_nvxRaytracing)
-	{
-		GfxContext* ctx = Platform_GetGfxContext();
-		m_nvxRaytracing->build(ctx,
-			m_vertexBuffer, m_vertexCount, GfxFormat_RGB32_Float, u32(sizeof(Vertex)),
-			m_indexBuffer, m_indexCount, GfxFormat_R32_Uint);
-	}
-#endif
-
 	{
 		BVHBuilder bvhBuilder;
 		bvhBuilder.build(
@@ -839,6 +837,8 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		desc.count = (u32)bvhBuilder.m_packedNodes.size();
 		m_bvhBuffer.takeover(Gfx_CreateBuffer(desc, bvhBuilder.m_packedNodes.data()));
 	}
+
+	m_nvxRaytracingDirty = true;
 
 	return true;
 }

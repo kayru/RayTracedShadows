@@ -145,6 +145,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 	GfxBuffer indexBuffer, u32 indexCount, GfxFormat indexFormat)
 {
 	RUSH_ASSERT(indexFormat == GfxFormat_R32_Uint || indexFormat == GfxFormat_R16_Uint);
+	RUSH_ASSERT(ctx->m_isActive);
 
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
@@ -166,6 +167,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 	VkGeometryNVX geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
 	geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;	
 	geometry.geometry.triangles = triangles;
+	geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX;
 	geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NVX;
 
 	VkAccelerationStructureCreateInfoNVX blasCreateInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
@@ -361,7 +363,7 @@ void NVXRaytracing::dispatch(GfxContext* ctx,
 	}
 
 	VkDescriptorImageInfo outputImageInfo = {};
-	outputImageInfo.imageView = device->m_textures[positionTexture].imageView;
+	outputImageInfo.imageView = device->m_textures[outputShadowMask].imageView;
 	outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 	{

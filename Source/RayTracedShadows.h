@@ -159,5 +159,6 @@ private:
 	Vec2 m_prevMousePos = Vec2(0.0f);
 
 	NVXRaytracing* m_nvxRaytracing = nullptr;
+	bool m_nvxRaytracingDirty = false;
 
 };
