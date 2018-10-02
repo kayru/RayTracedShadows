@@ -212,7 +212,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 	m_tlasMemoryOffset = u32(alignCeiling(blasMemoryReq.memoryRequirements.size, tlasMemoryReq.memoryRequirements.alignment));
 
 	{
-		u64 totalASMemorySize = m_tlasMemoryOffset + blasMemoryReq.memoryRequirements.size;
+		u64 totalASMemorySize = m_tlasMemoryOffset + tlasMemoryReq.memoryRequirements.size;
 		VkMemoryAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
 		allocInfo.memoryTypeIndex = device->memoryTypeFromProperties(
 			blasMemoryReq.memoryRequirements.memoryTypeBits,
@@ -260,7 +260,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 		0, VK_NULL_HANDLE, 0,
 		1, &geometry, blasCreateInfo.flags, VK_FALSE,
 		m_blas, VK_NULL_HANDLE,
-		m_scratchBuffer, m_scratchBufferSize);
+		m_scratchBuffer, 0);
 
 	Gfx_vkFullPipelineBarrier(ctx);
 
@@ -278,8 +278,13 @@ void NVXRaytracing::build(GfxContext * ctx,
 
 	InstanceDesc instanceData = {};
 	instanceData.transform[0] = 1;
-	instanceData.transform[4] = 1;
-	instanceData.transform[8] = 1;
+	instanceData.transform[5] = 1;
+	instanceData.transform[10] = 1;
+	instanceData.instanceID = 0;
+	instanceData.instanceMask = 0xFF;
+	instanceData.instanceContributionToHitGroupIndex = 0;
+	instanceData.flags = 0;
+
 	vkGetAccelerationStructureHandleNVX(vulkanDevice, m_blas, 8, &instanceData.accelerationStructureHandle);
 
 	GfxBufferDesc instanceBufferDesc;
@@ -296,7 +301,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 		1, instanceBufferVK.info.buffer, instanceBufferVK.info.offset,
 		0, nullptr, tlasCreateInfo.flags, VK_FALSE,
 		m_tlas, VK_NULL_HANDLE,
-		m_scratchBuffer, m_scratchBufferSize);
+		m_scratchBuffer, 0);
 
 	Gfx_vkFullPipelineBarrier(ctx);
 }
