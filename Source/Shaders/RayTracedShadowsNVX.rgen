@@ -58,7 +58,7 @@ void main()
 		shadowRayBias,	// float Tmin
 		direction,		// vec3 direction
 		1e9,			// float Tmax
-		1				// int payload
+		0				// int payload
 	);
 
 	ivec4 result = ivec4(payload);
