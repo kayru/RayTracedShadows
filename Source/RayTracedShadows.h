@@ -22,6 +22,12 @@
 
 class NVXRaytracing;
 
+enum class ShadowRenderMode
+{
+	Compute,
+	NVX,
+};
+
 class RayTracedShadowsApp : public BaseApplication
 {
 public:
@@ -160,5 +166,7 @@ private:
 
 	NVXRaytracing* m_nvxRaytracing = nullptr;
 	bool m_nvxRaytracingDirty = false;
+
+	ShadowRenderMode m_mode = ShadowRenderMode::Compute;
 
 };

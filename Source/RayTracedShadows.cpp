@@ -72,6 +72,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	if (caps.raytracing)
 	{
 		m_nvxRaytracing = new NVXRaytracing();
+		m_mode = ShadowRenderMode::NVX;
 	}
 #endif // USE_NVX_RAYTRACING
 
@@ -261,6 +262,16 @@ void RayTracedShadowsApp::update()
 	{
 		switch (e.type)
 		{
+		case WindowEventType_KeyDown:
+			if (e.code == Key_1)
+			{
+				m_mode = ShadowRenderMode::Compute;
+			}
+			else if (e.code == Key_2)
+			{
+				m_mode = ShadowRenderMode::NVX;
+			}
+			break;
 		case WindowEventType_Resize:
 			wantResize = true;
 			pendingSize = Tuple2i{ (int)e.width, (int)e.height };
@@ -362,6 +373,18 @@ void RayTracedShadowsApp::createRenderTargets(Tuple2i size)
 	m_shadowMask.takeover(Gfx_CreateTexture(desc));
 }
 
+const char* toString(ShadowRenderMode mode)
+{
+	switch (mode)
+	{
+	case ShadowRenderMode::Compute: return "Compute";
+	case ShadowRenderMode::NVX: return "NVX";
+	default:
+		RUSH_BREAK;
+		return "unknown";
+	}
+}
+
 void RayTracedShadowsApp::render()
 {
 #if USE_NVX_RAYTRACING
@@ -377,8 +400,15 @@ void RayTracedShadowsApp::render()
 	if (m_valid)
 	{
 		renderGbuffer();
-		//renderShadowMask();
-		renderShadowMaskNVX();
+
+		if (m_mode == ShadowRenderMode::NVX)
+		{
+			renderShadowMaskNVX();
+		}
+		else
+		{
+			renderShadowMask();
+		}
 	}
 
 	Gfx_AddImageBarrier(m_ctx, m_gbufferBaseColor, GfxResourceState_ShaderRead);
@@ -426,6 +456,7 @@ void RayTracedShadowsApp::render()
 		sprintf_s(timingString,
 			"Draw calls: %d\n"
 			"Vertices: %d\n"
+			"Mode: %s\n"
 			"GPU shadows: %.2f ms\n"
 			"mrays / sec: %.4f\n"
 			"GPU total: %.2f ms\n"
@@ -434,6 +465,7 @@ void RayTracedShadowsApp::render()
 			"> UI: %.2f ms",
 			stats.drawCalls,
 			stats.vertices,
+			toString(m_mode),
 			m_stats.gpuShadows.get() * 1000.0f,
 			raysPerSecond / 1000000.0,
 			m_stats.gpuTotal.get() * 1000.0f,
