@@ -75,4 +75,5 @@ target_link_libraries(${app}
 	Rush
 	stb
 	tiny_obj_loader
+	zeux_objparser
 )
