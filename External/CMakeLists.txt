@@ -8,3 +8,4 @@ endif()
 
 add_subdirectory("stb")
 add_subdirectory("tiny_obj_loader")
+add_subdirectory("zeux_objparser")

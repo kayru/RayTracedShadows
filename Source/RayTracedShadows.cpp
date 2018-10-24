@@ -14,7 +14,13 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize.h>
 
+#define USE_ZEUX_OBJPARSER 1
+
+#if USE_ZEUX_OBJPARSER
+#include <objparser.h>
+#else // USE_ZEUX_OBJPARSER
 #include <tiny_obj_loader.h>
+#endif // USE_ZEUX_OBJPARSER
 
 AppConfig g_appConfig;
 
@@ -689,6 +695,110 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 {
 	Log::message("Loading model '%s'", filename);
 
+	m_boundingBox.expandInit();
+
+	const GfxBufferDesc materialCbDesc(GfxBufferFlags::Constant, GfxFormat_Unknown, 1, sizeof(MaterialConstants));
+
+	std::vector<Vertex> vertices;
+	std::vector<u32> indices;
+
+	const double timeLoadBegin = m_timer.time();
+
+#if USE_ZEUX_OBJPARSER
+
+	ObjFile objFile;
+	bool loaded = objParseFile(objFile, filename);
+
+	if (!loaded)
+	{
+		Log::error("Could not load model from '%s'", filename);
+		return false;
+	}
+
+	if (!objValidate(objFile))
+	{
+		Log::error("Could not load model from '%s' (invalid file data)\n", filename);
+		return false;
+	}
+
+	// Obj parser produces a non-indexed mesh (no vertex deduplication).
+	// Meshoptimizer can be used to create vertex and index buffers for rasterization.
+	const u32 vertexCount = u32(objFile.f_size) / 3;
+	const u32 triangleCount = vertexCount / 3;
+
+	vertices.reserve(vertexCount);
+	indices.reserve(vertexCount);
+
+	const bool haveNormals = objFile.vn_size;
+
+	for (u32 i = 0; i < vertexCount; ++i)
+	{
+		const int vpi = objFile.f[i * 3 + 0]; // vertex position index
+		const int vti = objFile.f[i * 3 + 1]; // vertex texcoord index
+		const int vni = objFile.f[i * 3 + 2]; // vertex normal index
+
+		Vertex v = {};
+
+		v.position.x = objFile.v[vpi * 3 + 0];
+		v.position.y = objFile.v[vpi * 3 + 1];
+		v.position.z = objFile.v[vpi * 3 + 2];
+
+		if (haveNormals && vni >= 0)
+		{
+			v.normal.x = objFile.vn[vni * 3 + 0];
+			v.normal.y = objFile.vn[vni * 3 + 1];
+			v.normal.z = objFile.vn[vni * 3 + 2];
+		}
+
+		if (vti >= 0)
+		{
+			v.texcoord.x = objFile.vt[vti * 3 + 0];
+			v.texcoord.y = objFile.vt[vti * 3 + 1];
+		}
+
+		m_boundingBox.expand(v.position);
+
+		vertices.push_back(v);
+		indices.push_back(i);
+	}
+
+	if (!haveNormals)
+	{
+		for (u32 i = 0; i < triangleCount; ++i)
+		{
+			u32 idxA = i * 3 + 0;
+			u32 idxB = i * 3 + 1;
+			u32 idxC = i * 3 + 2;
+
+			Vec3 a = vertices[idxA].position;
+			Vec3 b = vertices[idxB].position;
+			Vec3 c = vertices[idxC].position;
+
+			Vec3 normal = cross(b - a, c - b);
+
+			normal = normalize(normal);
+
+			vertices[idxA].normal += normal;
+			vertices[idxB].normal += normal;
+			vertices[idxC].normal += normal;
+		}
+
+		for (u32 i = 0; i < (u32)vertices.size(); ++i)
+		{
+			vertices[i].normal = normalize(vertices[i].normal);
+		}
+	}
+
+	{
+		MeshSegment segment = {};
+		segment.material = 0xFFFFFFFF;
+		segment.indexOffset = 0;
+		segment.indexCount = u32(indices.size());
+		m_segments.push_back(segment);
+	}
+
+#else // USE_ZEUX_OBJPARSER
+
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
 	std::string errors;
@@ -702,7 +812,6 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		return false;
 	}
 
-	const GfxBufferDesc materialCbDesc(GfxBufferFlags::Constant, GfxFormat_Unknown, 1, sizeof(MaterialConstants));
 	for (auto& objMaterial : materials)
 	{
 		MaterialConstants constants;
@@ -733,18 +842,6 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 
 		m_materials.push_back(material);
 	}
-
-	{
-		MaterialConstants constants;
-		constants.baseColor = Vec4(1.0f);
-		m_defaultMaterial.constantBuffer.takeover(Gfx_CreateBuffer(materialCbDesc, &constants));
-		m_defaultMaterial.albedoTexture.retain(m_defaultWhiteTexture);
-	}
-
-	std::vector<Vertex> vertices;
-	std::vector<u32> indices;
-
-	m_boundingBox.expandInit();
 
 	for (const auto& shape : shapes)
 	{
@@ -841,10 +938,24 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 
 			m_segments.back().indexCount += 3;
 		}
-
-		m_vertexCount = (u32)vertices.size();
-		m_indexCount = (u32)indices.size();
 	}
+
+#endif // USE_ZEUX_OBJPARSER
+
+	const double timeObjParseEnd = m_timer.time();
+
+	m_vertexCount = (u32)vertices.size();
+	m_indexCount = (u32)indices.size();
+
+	Log::message("Model loaded in %f sec. (%d vertices, %d triangles)", timeObjParseEnd - timeLoadBegin, m_vertexCount, m_indexCount/3);
+
+	{
+		MaterialConstants constants;
+		constants.baseColor = Vec4(1.0f);
+		m_defaultMaterial.constantBuffer.takeover(Gfx_CreateBuffer(materialCbDesc, &constants));
+		m_defaultMaterial.albedoTexture.retain(m_defaultWhiteTexture);
+	}
+
 
 	GfxBufferDesc vbDesc(GfxBufferFlags::Vertex, GfxFormat_Unknown, m_vertexCount, sizeof(Vertex));
 	m_vertexBuffer = Gfx_CreateBuffer(vbDesc, vertices.data());
@@ -852,7 +963,9 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 	GfxBufferDesc ibDesc(GfxBufferFlags::Index, GfxFormat_R32_Uint, m_indexCount, 4);
 	m_indexBuffer = Gfx_CreateBuffer(ibDesc, indices.data());
 
-	Log::message("Building BVH");
+	const double timeBufferCreateEnd = m_timer.time();
+
+	Log::message("Building BVH ...");
 
 	{
 		BVHBuilder bvhBuilder;
@@ -871,6 +984,10 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 	}
 
 	m_nvxRaytracingDirty = true;
+
+	const double timeBVHBuildEnd = m_timer.time();
+
+	Log::message("BVH built in %f sec.", timeBVHBuildEnd - timeBufferCreateEnd);
 
 	return true;
 }
