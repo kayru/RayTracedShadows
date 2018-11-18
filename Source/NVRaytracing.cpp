@@ -1,4 +1,4 @@
-#include "NVXRaytracing.h"
+#include "NVRaytracing.h"
 #include <Rush/MathCommon.h>
 #include <Rush/UtilStaticArray.h>
 
@@ -9,7 +9,7 @@
 		RUSH_ASSERT_MSG(s == VK_SUCCESS, #x " call failed");                                                           \
 	}
 
-void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss)
+void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss)
 {
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
@@ -150,7 +150,7 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 	m_sbtBuffer = Gfx_CreateBuffer(instanceBufferDesc, m_shaderHandles.data());
 }
 
-void NVXRaytracing::build(GfxContext * ctx,
+void NVRaytracing::build(GfxContext * ctx,
 	GfxBuffer vertexBuffer, u32 vertexCount, GfxFormat positionFormat, u32 vertexStride,
 	GfxBuffer indexBuffer, u32 indexCount, GfxFormat indexFormat)
 {
@@ -329,7 +329,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 	Gfx_vkFullPipelineBarrier(ctx);
 }
 
-void NVXRaytracing::dispatch(GfxContext* ctx,
+void NVRaytracing::dispatch(GfxContext* ctx,
 	u32 width, u32 height,
 	GfxBuffer constants,
 	GfxSampler pointSampler,
@@ -447,7 +447,7 @@ void NVXRaytracing::dispatch(GfxContext* ctx,
 	ctx->m_dirtyState |= GfxContext::DirtyStateFlag_Pipeline;
 }
 
-void NVXRaytracing::reset()
+void NVRaytracing::reset()
 {
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;

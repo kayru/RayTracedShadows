@@ -1,8 +1,8 @@
 #include "RayTracedShadows.h"
 
-#if USE_NVX_RAYTRACING
-#include "NVXRaytracing.h"
-#endif // USE_NVX_RAYTRACING
+#if USE_NV_RAYTRACING
+#include "NVRaytracing.h"
+#endif // USE_NV_RAYTRACING
 
 #include <Rush/UtilFile.h>
 #include <Rush/UtilLog.h>
@@ -74,13 +74,13 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 	const GfxCapability& caps = Gfx_GetCapability();
 	
-#if USE_NVX_RAYTRACING
+#if USE_NV_RAYTRACING
 	if (caps.rayTracing)
 	{
-		m_nvxRaytracing = new NVXRaytracing();
-		m_mode = ShadowRenderMode::NVX;
+		m_nvRaytracing = new NVRaytracing();
+		m_mode = ShadowRenderMode::NV_ray_tracing;
 	}
-#endif // USE_NVX_RAYTRACING
+#endif // USE_NV_RAYTRACING
 
 	m_windowEvents.setOwner(m_window);
 
@@ -176,13 +176,13 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		}
 	}
 
-#if USE_NVX_RAYTRACING
-	if (m_nvxRaytracing)
+#if USE_NV_RAYTRACING
+	if (m_nvRaytracing)
 	{
-		GfxShaderSource rgen = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsNVX.rgen"));
-		GfxShaderSource rmiss = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsNVX.rmiss"));
+		GfxShaderSource rgen = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsNV.rgen"));
+		GfxShaderSource rmiss = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsNV.rmiss"));
 
-		m_nvxRaytracing->createPipeline(rgen, rmiss);
+		m_nvRaytracing->createPipeline(rgen, rmiss);
 	}
 #endif
 
@@ -236,7 +236,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 RayTracedShadowsApp::~RayTracedShadowsApp()
 {
-	delete m_nvxRaytracing;
+	delete m_nvRaytracing;
 
 	m_windowEvents.setOwner(nullptr);
 
@@ -275,7 +275,7 @@ void RayTracedShadowsApp::update()
 			}
 			else if (e.code == Key_2)
 			{
-				m_mode = ShadowRenderMode::NVX;
+				m_mode = ShadowRenderMode::NV_ray_tracing;
 			}
 			break;
 		case WindowEventType_Resize:
@@ -384,7 +384,7 @@ const char* toString(ShadowRenderMode mode)
 	switch (mode)
 	{
 	case ShadowRenderMode::Compute: return "Compute";
-	case ShadowRenderMode::NVX: return "NVX";
+	case ShadowRenderMode::NV_ray_tracing: return "NV_ray_tracing";
 	default:
 		RUSH_BREAK;
 		return "unknown";
@@ -393,13 +393,13 @@ const char* toString(ShadowRenderMode mode)
 
 void RayTracedShadowsApp::render()
 {
-#if USE_NVX_RAYTRACING
-	if (m_nvxRaytracingDirty && m_nvxRaytracing)
+#if USE_NV_RAYTRACING
+	if (m_nvRaytracingDirty && m_nvRaytracing)
 	{
-		m_nvxRaytracing->build(m_ctx,
+		m_nvRaytracing->build(m_ctx,
 			m_vertexBuffer, m_vertexCount, GfxFormat_RGB32_Float, u32(sizeof(Vertex)),
 			m_indexBuffer, m_indexCount, GfxFormat_R32_Uint);
-		m_nvxRaytracingDirty = false;
+		m_nvRaytracingDirty = false;
 	}
 #endif
 
@@ -407,9 +407,9 @@ void RayTracedShadowsApp::render()
 	{
 		renderGbuffer();
 
-		if (m_mode == ShadowRenderMode::NVX)
+		if (m_mode == ShadowRenderMode::NV_ray_tracing)
 		{
-			renderShadowMaskNVX();
+			renderShadowMaskNV();
 		}
 		else
 		{
@@ -571,7 +571,7 @@ void RayTracedShadowsApp::renderShadowMask()
 	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
 }
 
-void RayTracedShadowsApp::renderShadowMaskNVX()
+void RayTracedShadowsApp::renderShadowMaskNV()
 {
 	Gfx_BeginTimer(m_ctx, Timestamp_Shadows);
 
@@ -584,7 +584,7 @@ void RayTracedShadowsApp::renderShadowMaskNVX()
 	constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
 	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);
 
-	m_nvxRaytracing->dispatch(m_ctx, 
+	m_nvRaytracing->dispatch(m_ctx, 
 		desc.width, desc.height,
 		m_rayTracingConstantBuffer.get(),
 		m_samplerStates.pointClamp.get(),
@@ -983,7 +983,7 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		m_bvhBuffer.takeover(Gfx_CreateBuffer(desc, bvhBuilder.m_packedNodes.data()));
 	}
 
-	m_nvxRaytracingDirty = true;
+	m_nvRaytracingDirty = true;
 
 	const double timeBVHBuildEnd = m_timer.time();
 

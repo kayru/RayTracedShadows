@@ -5,11 +5,11 @@
 
 #include <vector>
 
-class NVXRaytracing
+class NVRaytracing
 {
 public:
 
-	~NVXRaytracing() { reset(); }
+	~NVRaytracing() { reset(); }
 
 	void createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss);
 

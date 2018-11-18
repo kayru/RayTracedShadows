@@ -12,8 +12,8 @@ set(shaders
 
 if (${RUSH_RENDER_API} MATCHES "VK")
 	set(shaders ${shaders}
-		Shaders/RayTracedShadowsNVX.rgen
-		Shaders/RayTracedShadowsNVX.rmiss
+		Shaders/RayTracedShadowsNV.rgen
+		Shaders/RayTracedShadowsNV.rmiss
 	)
 endif()
 
@@ -77,11 +77,11 @@ endforeach()
 
 if (${RUSH_RENDER_API} MATCHES "VK")
 	target_compile_definitions(${app} PRIVATE
-		USE_NVX_RAYTRACING=1
+		USE_NV_RAYTRACING=1
 	)
 	target_sources(${app} PRIVATE
-		NVXRaytracing.h
-		NVXRaytracing.cpp
+		NVRaytracing.h
+		NVRaytracing.cpp
 	)
 endif()
 
