@@ -26,8 +26,8 @@ public:
 
 	void reset();
 
-	VkAccelerationStructureNVX m_blas = VK_NULL_HANDLE;
-	VkAccelerationStructureNVX m_tlas = VK_NULL_HANDLE;
+	VkAccelerationStructureNV m_blas = VK_NULL_HANDLE;
+	VkAccelerationStructureNV m_tlas = VK_NULL_HANDLE;
 
 	VkDeviceMemory m_memory = VK_NULL_HANDLE;
 	u32 m_blasMemoryOffset = 0;

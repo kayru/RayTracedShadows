@@ -39,7 +39,7 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 		item.binding = 0;
 		item.descriptorCount = 1;
 		item.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 		bindings.pushBack(item);
 	}
 
@@ -48,7 +48,7 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 		item.binding = 1;
 		item.descriptorCount = 1;
 		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 		bindings.pushBack(item);
 	}
 
@@ -57,7 +57,7 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 		item.binding = 2;
 		item.descriptorCount = 1;
 		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 		bindings.pushBack(item);
 	}
 
@@ -66,7 +66,7 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 		item.binding = 3;
 		item.descriptorCount = 1;
 		item.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 		bindings.pushBack(item);
 	}
 
@@ -74,8 +74,8 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 		VkDescriptorSetLayoutBinding item = {};
 		item.binding = 4;
 		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 		bindings.pushBack(item);
 	}
 
@@ -93,37 +93,47 @@ void NVXRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderS
 
 	// create pipeline
 
-	VkRaytracingPipelineCreateInfoNVX createInfo = { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
+	VkRayTracingPipelineCreateInfoNV createInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV };
 
 	VkPipelineShaderStageCreateInfo shaderStages[2] = {};
+	VkRayTracingShaderGroupCreateInfoNV shaderGroups[2] = {};
 
 	shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+	shaderStages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 	shaderStages[0].module = m_rayGenShader;
 	shaderStages[0].pName = "main";
 
+	shaderGroups[0].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV;
+	shaderGroups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+	shaderGroups[0].generalShader = 0;
+
 	shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStages[1].stage = VK_SHADER_STAGE_MISS_BIT_NVX;
+	shaderStages[1].stage = VK_SHADER_STAGE_MISS_BIT_NV;
 	shaderStages[1].module = m_rayMissShader;
 	shaderStages[1].pName = "main";
+
+	shaderGroups[1].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV;
+	shaderGroups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+	shaderGroups[1].generalShader = 1;
 
 	createInfo.stageCount = 2;
 	createInfo.pStages = shaderStages;
 
-	u32 groupNumbers[2] = { 0, 1 };
-	createInfo.pGroupNumbers = groupNumbers;
+	createInfo.groupCount = 2;
+	createInfo.pGroups = shaderGroups;
+	
 	createInfo.maxRecursionDepth = 1;
 
 	createInfo.layout = m_pipelineLayout;
 
-	V(vkCreateRaytracingPipelinesNVX(vulkanDevice, 
+	V(vkCreateRayTracingPipelinesNV(vulkanDevice,
 		device->m_pipelineCache,
 		1, &createInfo, nullptr, &m_pipeline));
 
-	m_shaderHandleSize = device->m_nvxRaytracingProps.shaderHeaderSize;
+	m_shaderHandleSize = device->m_nvRayTracingProps.shaderGroupHandleSize;
 	m_shaderHandles.resize(m_shaderHandleSize * 2);
 
-	vkGetRaytracingShaderHandlesNVX(vulkanDevice, m_pipeline,
+	vkGetRayTracingShaderGroupHandlesNV(vulkanDevice, m_pipeline,
 		0, 2, u32(m_shaderHandles.size()), m_shaderHandles.data());
 
 	m_sbtMissStride = m_shaderHandleSize;
@@ -153,7 +163,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 	const BufferVK& vertexBufferVK = device->m_buffers[vertexBuffer];
 	const BufferVK& indexBufferVK = device->m_buffers[indexBuffer];
 
-	VkGeometryTrianglesNVX triangles = { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX };
+	VkGeometryTrianglesNV triangles = { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
 	triangles.vertexData = vertexBufferVK.info.buffer;
 	triangles.vertexOffset = vertexBufferVK.info.offset;
 	triangles.vertexCount = vertexCount;
@@ -164,25 +174,31 @@ void NVXRaytracing::build(GfxContext * ctx,
 	triangles.indexCount = indexCount;
 	triangles.indexType = indexFormat == GfxFormat_R32_Uint ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_UINT16;
 
-	VkGeometryNVX geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
-	geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;	
+	VkGeometryNV geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NV };
+	geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;	
 	geometry.geometry.triangles = triangles;
-	geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX;
-	geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NVX;
+	geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV;
+	geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV;
 
-	VkAccelerationStructureCreateInfoNVX blasCreateInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
-	blasCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX;
-	blasCreateInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX;
-	blasCreateInfo.geometryCount = 1;
-	blasCreateInfo.pGeometries = &geometry;
+	VkAccelerationStructureInfoNV blasInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+	blasInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+	blasInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV;
+	blasInfo.geometryCount = 1;
+	blasInfo.pGeometries = &geometry;
 
-	VkAccelerationStructureCreateInfoNVX tlasCreateInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
-	tlasCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX;
-	tlasCreateInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX;
-	tlasCreateInfo.instanceCount = 1;
+	VkAccelerationStructureCreateInfoNV blasCreateInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+	blasCreateInfo.info = blasInfo;
 
-	V(vkCreateAccelerationStructureNVX(vulkanDevice, &blasCreateInfo, nullptr, &m_blas));
-	V(vkCreateAccelerationStructureNVX(vulkanDevice, &tlasCreateInfo, nullptr, &m_tlas));
+	VkAccelerationStructureInfoNV tlasInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+	tlasInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+	tlasInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV;
+	tlasInfo.instanceCount = 1;
+
+	VkAccelerationStructureCreateInfoNV tlasCreateInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+	tlasCreateInfo.info = tlasInfo;
+
+	V(vkCreateAccelerationStructureNV(vulkanDevice, &blasCreateInfo, nullptr, &m_blas));
+	V(vkCreateAccelerationStructureNV(vulkanDevice, &tlasCreateInfo, nullptr, &m_tlas));
 
 	VkMemoryRequirements2KHR blasMemoryReq = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
 	VkMemoryRequirements2KHR tlasMemoryReq = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
@@ -190,17 +206,24 @@ void NVXRaytracing::build(GfxContext * ctx,
 	VkMemoryRequirements2KHR tlasScratchMemoryReq = { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
 
 	{
-		VkAccelerationStructureMemoryRequirementsInfoNVX memoryReqInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX };
+		VkAccelerationStructureMemoryRequirementsInfoNV memoryReqInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
 		memoryReqInfo.accelerationStructure = m_blas;
-		vkGetAccelerationStructureMemoryRequirementsNVX(vulkanDevice, &memoryReqInfo, &blasMemoryReq);
-		vkGetAccelerationStructureScratchMemoryRequirementsNVX(vulkanDevice, &memoryReqInfo, &blasScratchMemoryReq);
+		memoryReqInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
+		vkGetAccelerationStructureMemoryRequirementsNV(vulkanDevice, &memoryReqInfo, &blasMemoryReq);
+
+		memoryReqInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+		vkGetAccelerationStructureMemoryRequirementsNV(vulkanDevice, &memoryReqInfo, &blasScratchMemoryReq);
 	}
-	
+
 	{
-		VkAccelerationStructureMemoryRequirementsInfoNVX memoryReqInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX };
+		VkAccelerationStructureMemoryRequirementsInfoNV memoryReqInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
 		memoryReqInfo.accelerationStructure = m_tlas;
-		vkGetAccelerationStructureMemoryRequirementsNVX(vulkanDevice, &memoryReqInfo, &tlasMemoryReq);
-		vkGetAccelerationStructureScratchMemoryRequirementsNVX(vulkanDevice, &memoryReqInfo, &tlasScratchMemoryReq);
+		memoryReqInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
+
+		vkGetAccelerationStructureMemoryRequirementsNV(vulkanDevice, &memoryReqInfo, &tlasMemoryReq);
+
+		memoryReqInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+		vkGetAccelerationStructureMemoryRequirementsNV(vulkanDevice, &memoryReqInfo, &tlasScratchMemoryReq);
 	}
 
 	RUSH_ASSERT(blasScratchMemoryReq.memoryRequirements.memoryTypeBits == tlasScratchMemoryReq.memoryRequirements.memoryTypeBits);
@@ -222,8 +245,8 @@ void NVXRaytracing::build(GfxContext * ctx,
 	}
 
 	{
-		VkBindAccelerationStructureMemoryInfoNVX bindInfos[2] = {};
-		for (auto& it : bindInfos) it.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NVX;
+		VkBindAccelerationStructureMemoryInfoNV bindInfos[2] = {};
+		for (auto& it : bindInfos) it.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NV;
 
 		bindInfos[0].accelerationStructure = m_blas;
 		bindInfos[0].memory = m_memory;
@@ -233,12 +256,12 @@ void NVXRaytracing::build(GfxContext * ctx,
 		bindInfos[1].memory = m_memory;
 		bindInfos[1].memoryOffset = m_tlasMemoryOffset;
 
-		V(vkBindAccelerationStructureMemoryNVX(vulkanDevice, 2, bindInfos));
+		V(vkBindAccelerationStructureMemoryNV(vulkanDevice, 2, bindInfos));
 	}
 
 	{
 		VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-		bufferCreateInfo.usage = VK_BUFFER_USAGE_RAYTRACING_BIT_NVX;
+		bufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
 		bufferCreateInfo.size = m_scratchBufferSize;
 
 		V(vkCreateBuffer(vulkanDevice, &bufferCreateInfo, nullptr, &m_scratchBuffer));
@@ -255,11 +278,11 @@ void NVXRaytracing::build(GfxContext * ctx,
 
 	// build bottom level acceleration structure
 
-	vkCmdBuildAccelerationStructureNVX(ctx->m_commandBuffer,
-		blasCreateInfo.type,
-		0, VK_NULL_HANDLE, 0,
-		1, &geometry, blasCreateInfo.flags, VK_FALSE,
-		m_blas, VK_NULL_HANDLE,
+	vkCmdBuildAccelerationStructureNV(ctx->m_commandBuffer,
+		&blasInfo,
+		VK_NULL_HANDLE, 0, // instance data, instance offset
+		VK_FALSE, // update
+		m_blas, VK_NULL_HANDLE, // dest, source
 		m_scratchBuffer, 0);
 
 	Gfx_vkFullPipelineBarrier(ctx);
@@ -285,7 +308,7 @@ void NVXRaytracing::build(GfxContext * ctx,
 	instanceData.instanceContributionToHitGroupIndex = 0;
 	instanceData.flags = 0;
 
-	vkGetAccelerationStructureHandleNVX(vulkanDevice, m_blas, 8, &instanceData.accelerationStructureHandle);
+	vkGetAccelerationStructureHandleNV(vulkanDevice, m_blas, 8, &instanceData.accelerationStructureHandle);
 
 	GfxBufferDesc instanceBufferDesc;
 	instanceBufferDesc.flags = GfxBufferFlags::Transient;
@@ -296,11 +319,11 @@ void NVXRaytracing::build(GfxContext * ctx,
 	BufferVK& instanceBufferVK = device->m_buffers[instanceBuffer];
 
 	VkBuffer instanceDataBuffer = VK_NULL_HANDLE;
-	vkCmdBuildAccelerationStructureNVX(ctx->m_commandBuffer,
-		tlasCreateInfo.type, 
-		1, instanceBufferVK.info.buffer, instanceBufferVK.info.offset,
-		0, nullptr, tlasCreateInfo.flags, VK_FALSE,
-		m_tlas, VK_NULL_HANDLE,
+	vkCmdBuildAccelerationStructureNV(ctx->m_commandBuffer,
+		&tlasInfo,
+		instanceBufferVK.info.buffer, instanceBufferVK.info.offset,
+		VK_FALSE, // update
+		m_tlas, VK_NULL_HANDLE, // dest, source
 		m_scratchBuffer, 0);
 
 	Gfx_vkFullPipelineBarrier(ctx);
@@ -382,7 +405,7 @@ void NVXRaytracing::dispatch(GfxContext* ctx,
 		descriptors.pushBack(item);
 	}
 
-	VkDescriptorAccelerationStructureInfoNVX tlasInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
+	VkWriteDescriptorSetAccelerationStructureNV tlasInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
 	tlasInfo.accelerationStructureCount = 1;
 	tlasInfo.pAccelerationStructures = &m_tlas;
 
@@ -392,7 +415,7 @@ void NVXRaytracing::dispatch(GfxContext* ctx,
 		item.dstSet = descriptorSet;
 		item.dstBinding = 4;
 		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
 		item.pNext = &tlasInfo;
 		descriptors.pushBack(item);
 	}
@@ -403,22 +426,23 @@ void NVXRaytracing::dispatch(GfxContext* ctx,
 		0, nullptr);
 
 	vkCmdBindPipeline(ctx->m_commandBuffer,
-		VK_PIPELINE_BIND_POINT_RAYTRACING_NVX,
+		VK_PIPELINE_BIND_POINT_RAY_TRACING_NV,
 		m_pipeline);
 
 	vkCmdBindDescriptorSets(ctx->m_commandBuffer,
-		VK_PIPELINE_BIND_POINT_RAYTRACING_NVX,
+		VK_PIPELINE_BIND_POINT_RAY_TRACING_NV,
 		m_pipelineLayout, 0, 1, &descriptorSet,
 		0, nullptr);
 
 	const BufferVK& sbtBufferVK = device->m_buffers[m_sbtBuffer];
 	VkBuffer sbtBuffer = sbtBufferVK.info.buffer;
 
-	vkCmdTraceRaysNVX(ctx->m_commandBuffer,
+	vkCmdTraceRaysNV(ctx->m_commandBuffer,
 		sbtBuffer, sbtBufferVK.info.offset + m_sbtRaygenOffset,
 		sbtBuffer, sbtBufferVK.info.offset + m_sbtMissOffset, m_sbtMissStride,
 		sbtBuffer, sbtBufferVK.info.offset + m_sbtHitOffset, m_sbtHitStride,
-		width, height);
+		VK_NULL_HANDLE, 0, 0, // callable shader table
+		width, height, 1);
 
 	ctx->m_dirtyState |= GfxContext::DirtyStateFlag_Pipeline;
 }
@@ -445,7 +469,7 @@ void NVXRaytracing::reset()
 
 	vkDestroyBuffer(vulkanDevice, m_scratchBuffer, nullptr);
 
-	vkDestroyAccelerationStructureNVX(vulkanDevice, m_blas, nullptr);
-	vkDestroyAccelerationStructureNVX(vulkanDevice, m_tlas, nullptr);
+	vkDestroyAccelerationStructureNV(vulkanDevice, m_blas, nullptr);
+	vkDestroyAccelerationStructureNV(vulkanDevice, m_tlas, nullptr);
 }
 

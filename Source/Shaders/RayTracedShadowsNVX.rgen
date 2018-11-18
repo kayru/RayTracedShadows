@@ -1,5 +1,5 @@
 #version 460
-#extension GL_NVX_raytracing : enable
+#extension GL_NV_ray_tracing : enable
 
 layout (binding = 0) uniform Constants
 {
@@ -13,9 +13,9 @@ layout(binding = 1) uniform sampler defaultSampler;
 layout(binding = 2) uniform texture2D gbufferPositionTexture;
 layout(binding = 3, r8) uniform image2D outputShadowMask;
 
-layout(binding = 4) uniform accelerationStructureNVX TLAS;
+layout(binding = 4) uniform accelerationStructureNV TLAS;
 
-layout(location = 0) rayPayloadNVX uint payload;
+layout(location = 0) rayPayloadNV uint payload;
 
 float computeEpsilonForValue(float f, uint exponentDiff)
 {
@@ -33,7 +33,7 @@ float max3(vec3 v)
 
 void main()
 {
-	ivec2 pixelIndex = ivec2(gl_LaunchIDNVX.xy);
+	ivec2 pixelIndex = ivec2(gl_LaunchIDNV.xy);
 
 	vec3 direction = lightDirection.xyz;
 	vec3 cameraRelativePosition = texelFetch(sampler2D(gbufferPositionTexture, defaultSampler), pixelIndex, 0).xyz;
@@ -44,11 +44,11 @@ void main()
 		computeEpsilonForValue(max3(abs(origin)), 13),
 		computeEpsilonForValue(max3(abs(cameraRelativePosition)), 13));
 
-	uint rayFlags = gl_RayFlagsOpaqueNVX | gl_RayFlagsTerminateOnFirstHitNVX | gl_RayFlagsSkipClosestHitShaderNVX;
+	uint rayFlags = gl_RayFlagsOpaqueNV | gl_RayFlagsTerminateOnFirstHitNV | gl_RayFlagsSkipClosestHitShaderNV;
 
 	payload = 0;
 
-	traceNVX(TLAS,
+	traceNV(TLAS,
 		rayFlags,		// uint rayFlags
 		~0u, 			// uint cullMask
 		0u,	 			// uint sbtRecordOffset

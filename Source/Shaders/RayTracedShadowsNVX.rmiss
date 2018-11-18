@@ -1,7 +1,7 @@
 #version 460
-#extension GL_NVX_raytracing : enable
+#extension GL_NV_ray_tracing : enable
 
-layout(location = 0) rayPayloadInNVX uint payload;
+layout(location = 0) rayPayloadInNV uint payload;
 
 void main()
 {

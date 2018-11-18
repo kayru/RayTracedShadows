@@ -75,7 +75,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	const GfxCapability& caps = Gfx_GetCapability();
 	
 #if USE_NVX_RAYTRACING
-	if (caps.raytracing)
+	if (caps.rayTracing)
 	{
 		m_nvxRaytracing = new NVXRaytracing();
 		m_mode = ShadowRenderMode::NVX;
