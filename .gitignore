@@ -7,3 +7,5 @@ build
 *.user
 .vs
 x64
+Tools
+tools
