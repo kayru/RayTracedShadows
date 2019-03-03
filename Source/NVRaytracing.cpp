@@ -131,10 +131,10 @@ void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSo
 		1, &createInfo, nullptr, &m_pipeline));
 
 	m_shaderHandleSize = device->m_nvRayTracingProps.shaderGroupHandleSize;
-	m_shaderHandles.resize(m_shaderHandleSize * 2);
+	m_shaderHandles.resize(m_shaderHandleSize * createInfo.groupCount);
 
 	vkGetRayTracingShaderGroupHandlesNV(vulkanDevice, m_pipeline,
-		0, 2, u32(m_shaderHandles.size()), m_shaderHandles.data());
+		0, createInfo.groupCount, u32(m_shaderHandles.size()), m_shaderHandles.data());
 
 	m_sbtMissStride = m_shaderHandleSize;
 	m_sbtHitStride = m_shaderHandleSize;
@@ -142,12 +142,12 @@ void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSo
 	m_sbtRaygenOffset = 0 * m_shaderHandleSize;
 	m_sbtMissOffset = 1 * m_shaderHandleSize;
 
-	GfxBufferDesc instanceBufferDesc;
-	instanceBufferDesc.flags = GfxBufferFlags::None;
-	instanceBufferDesc.count = 2;
-	instanceBufferDesc.stride = m_shaderHandleSize;
+	GfxBufferDesc sbtBufferDesc;
+	sbtBufferDesc.flags = GfxBufferFlags::None;
+	sbtBufferDesc.count = createInfo.groupCount;
+	sbtBufferDesc.stride = m_shaderHandleSize;
 
-	m_sbtBuffer = Gfx_CreateBuffer(instanceBufferDesc, m_shaderHandles.data());
+	m_sbtBuffer = Gfx_CreateBuffer(sbtBufferDesc, m_shaderHandles.data());
 }
 
 void NVRaytracing::build(GfxContext * ctx,
