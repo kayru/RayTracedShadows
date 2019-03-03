@@ -749,6 +749,10 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 			v.normal.y = objFile.vn[vni * 3 + 1];
 			v.normal.z = objFile.vn[vni * 3 + 2];
 		}
+		else
+		{
+			v.normal = Vec3(0.0);
+		}
 
 		if (vti >= 0)
 		{

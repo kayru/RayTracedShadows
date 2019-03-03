@@ -35,6 +35,6 @@ void main()
 	outCameraRelativePosition.xyz = v_worldPos.xyz - g_cameraPosition.xyz;
 
 	fragColor0 = outBaseColor;
-	fragColor1 = outNormal;
+	fragColor1 = gl_FrontFacing ? outNormal : -outNormal;
 	fragColor2 = outCameraRelativePosition;
 }
