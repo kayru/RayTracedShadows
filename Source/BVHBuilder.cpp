@@ -299,7 +299,7 @@ void BVHBuilder::build(const float* vertices, u32 stride, const u32* indices, u3
 		Vec3 bboxMax(oldNode.bboxMax);
 		setBounds(newNode, bboxMin, bboxMax);
 
-		newNode.prim = oldNode.prim;;
+		newNode.prim = oldNode.prim;
 		newNode.next = oldNode.next == BVHNode::InvalidMask
 			? BVHNode::InvalidMask
 			: tempNodes[oldNode.next].visitOrder;

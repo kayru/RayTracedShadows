@@ -20,6 +20,14 @@
 #include "BVHBuilder.h"
 #include "MovingAverage.h"
 
+class NVRaytracing;
+
+enum class ShadowRenderMode
+{
+	Compute,
+	NV_ray_tracing,
+};
+
 class RayTracedShadowsApp : public BaseApplication
 {
 public:
@@ -53,6 +61,7 @@ private:
 	};
 
 	void renderShadowMask();
+	void renderShadowMaskNV();
 
 	bool loadModel(const char* filename);
 	GfxRef<GfxTexture> loadTexture(const std::string& filename);
@@ -154,5 +163,10 @@ private:
 	GfxBufferRef m_bvhBuffer;
 
 	Vec2 m_prevMousePos = Vec2(0.0f);
+
+	NVRaytracing* m_nvRaytracing = nullptr;
+	bool m_nvRaytracingDirty = false;
+
+	ShadowRenderMode m_mode = ShadowRenderMode::Compute;
 
 };

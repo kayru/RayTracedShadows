@@ -1,0 +1,66 @@
+#version 460
+#extension GL_NV_ray_tracing : enable
+
+layout (binding = 0) uniform Constants
+{
+	vec4 cameraPosition;
+	vec4 cameraDirection;
+	vec4 lightDirection;
+	vec4 renderTargetSize;
+};
+
+layout(binding = 1) uniform sampler defaultSampler;
+layout(binding = 2) uniform texture2D gbufferPositionTexture;
+layout(binding = 3, r8) uniform image2D outputShadowMask;
+
+layout(binding = 4) uniform accelerationStructureNV TLAS;
+
+layout(location = 0) rayPayloadNV uint payload;
+
+float computeEpsilonForValue(float f, uint exponentDiff)
+{
+	uint u = floatBitsToUint(f);
+	uint exponent = bitfieldExtract(u, 23, 8);
+	exponent -= min(exponentDiff, exponent);
+	u = bitfieldInsert(u, exponent, 23, 8);
+	return uintBitsToFloat(u);
+}
+
+float max3(vec3 v)
+{
+	return max(max(v.x, v.y), v.z);
+}
+
+void main()
+{
+	ivec2 pixelIndex = ivec2(gl_LaunchIDNV.xy);
+
+	vec3 direction = lightDirection.xyz;
+	vec3 cameraRelativePosition = texelFetch(sampler2D(gbufferPositionTexture, defaultSampler), pixelIndex, 0).xyz;
+	vec3 origin = cameraPosition.xyz + cameraRelativePosition;
+
+	// TODO: we should be pushing the ray away in the direction of the surface normal
+	float shadowRayBias = max(
+		computeEpsilonForValue(max3(abs(origin)), 13),
+		computeEpsilonForValue(max3(abs(cameraRelativePosition)), 13));
+
+	uint rayFlags = gl_RayFlagsOpaqueNV | gl_RayFlagsTerminateOnFirstHitNV | gl_RayFlagsSkipClosestHitShaderNV;
+
+	payload = 0;
+
+	traceNV(TLAS,
+		rayFlags,		// uint rayFlags
+		~0u, 			// uint cullMask
+		0u,	 			// uint sbtRecordOffset
+		0u, 			// uint sbtRecordStride
+		0u,				// uint missIndex
+		origin,			// vec3 origin
+		shadowRayBias,	// float Tmin
+		direction,		// vec3 direction
+		1e9,			// float Tmax
+		0				// int payload
+	);
+
+	ivec4 result = ivec4(payload);
+	imageStore(outputShadowMask, pixelIndex, result);
+}

@@ -10,6 +10,13 @@ set(shaders
 	Shaders/RayTracedShadows.comp
 )
 
+if (${RUSH_RENDER_API} MATCHES "VK")
+	set(shaders ${shaders}
+		Shaders/RayTracedShadowsNV.rgen
+		Shaders/RayTracedShadowsNV.rmiss
+	)
+endif()
+
 set(src
 	${shaders}
 	BaseApplication.cpp
@@ -29,7 +36,8 @@ add_executable(${app}
 
 source_group("Shaders" FILES ${shaders} ${shaderDependencies})
 
-find_program(GLSLC NAMES glslc PATHS
+find_program(GLSLC NAMES glslc NO_SYSTEM_ENVIRONMENT_PATH PATHS
+	"../Tools"
 	$ENV{VULKAN_SDK}/Bin
 	$ENV{VK_SDK_PATH}/Bin
 	$ENV{PATH}
@@ -66,6 +74,16 @@ endif()
 foreach(shader ${shaders})
 	shader_compile_rule(${shader} "${shaderDependencies}")
 endforeach()
+
+if (${RUSH_RENDER_API} MATCHES "VK")
+	target_compile_definitions(${app} PRIVATE
+		USE_NV_RAYTRACING=1
+	)
+	target_sources(${app} PRIVATE
+		NVRaytracing.h
+		NVRaytracing.cpp
+	)
+endif()
 
 target_compile_definitions(${app} PRIVATE
 	RUSH_USING_NAMESPACE # Automatically use Rush namespace
