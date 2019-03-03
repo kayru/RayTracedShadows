@@ -266,8 +266,11 @@ void NVRaytracing::build(GfxContext * ctx,
 
 		V(vkCreateBuffer(vulkanDevice, &bufferCreateInfo, nullptr, &m_scratchBuffer));
 
+		VkMemoryRequirements scratchBufferRequirements = {};
+		vkGetBufferMemoryRequirements(vulkanDevice, m_scratchBuffer, &scratchBufferRequirements);
+
 		VkMemoryAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-		allocInfo.allocationSize = m_scratchBufferSize;
+		allocInfo.allocationSize = max(m_scratchBufferSize, scratchBufferRequirements.size);
 		allocInfo.memoryTypeIndex = device->memoryTypeFromProperties(
 			blasScratchMemoryReq.memoryRequirements.memoryTypeBits,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -454,7 +457,9 @@ void NVRaytracing::reset()
 
 	Gfx_DestroyBuffer(m_sbtBuffer);
 
-	// TODO: Enqueue destruction
+	// TODO: Enqueue destruction to avoid wait-for-idle
+
+	vkDeviceWaitIdle(vulkanDevice);
 
 	vkDestroyShaderModule(vulkanDevice, m_rayGenShader, nullptr);
 	vkDestroyShaderModule(vulkanDevice, m_rayMissShader, nullptr);
