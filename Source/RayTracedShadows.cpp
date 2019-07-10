@@ -72,9 +72,8 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 {
 	Gfx_SetPresentInterval(1);
 
-	const GfxCapability& caps = Gfx_GetCapability();
-	
 #if USE_NV_RAYTRACING
+	const GfxCapability& caps = Gfx_GetCapability();
 	if (caps.rayTracing)
 	{
 		m_nvRaytracing = new NVRaytracing();
@@ -184,7 +183,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 		m_nvRaytracing->createPipeline(rgen, rmiss);
 	}
-#endif
+#endif // USE_NV_RAYTRACING
 
 	{
 		GfxBufferDesc cbDesc(GfxBufferFlags::TransientConstant, GfxFormat_Unknown, 1, sizeof(ModelConstants));
@@ -236,7 +235,9 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 RayTracedShadowsApp::~RayTracedShadowsApp()
 {
+#if USE_NV_RAYTRACING
 	delete m_nvRaytracing;
+#endif // USE_NV_RAYTRACING
 
 	m_windowEvents.setOwner(nullptr);
 
@@ -401,7 +402,7 @@ void RayTracedShadowsApp::render()
 			m_indexBuffer, m_indexCount, GfxFormat_R32_Uint);
 		m_nvRaytracingDirty = false;
 	}
-#endif
+#endif // USE_NV_RAYTRACING
 
 	if (m_valid)
 	{
@@ -584,12 +585,14 @@ void RayTracedShadowsApp::renderShadowMaskNV()
 	constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
 	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);
 
+#if USE_NV_RAYTRACING
 	m_nvRaytracing->dispatch(m_ctx, 
 		desc.width, desc.height,
 		m_rayTracingConstantBuffer.get(),
 		m_samplerStates.pointClamp.get(),
 		m_gbufferPosition.get(),
 		m_shadowMask.get());
+#endif // USE_NV_RAYTRACING
 
 	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
 }
@@ -987,7 +990,9 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		m_bvhBuffer.takeover(Gfx_CreateBuffer(desc, bvhBuilder.m_packedNodes.data()));
 	}
 
+#if USE_NV_RAYTRACING
 	m_nvRaytracingDirty = true;
+#endif // USE_NV_RAYTRACING
 
 	const double timeBVHBuildEnd = m_timer.time();
 

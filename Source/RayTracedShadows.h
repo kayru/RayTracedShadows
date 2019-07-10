@@ -164,8 +164,10 @@ private:
 
 	Vec2 m_prevMousePos = Vec2(0.0f);
 
+#if USE_NV_RAYTRACING
 	NVRaytracing* m_nvRaytracing = nullptr;
 	bool m_nvRaytracingDirty = false;
+#endif // USE_NV_RAYTRACING
 
 	ShadowRenderMode m_mode = ShadowRenderMode::Compute;
 
