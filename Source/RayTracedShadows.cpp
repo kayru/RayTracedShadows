@@ -74,7 +74,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 #if USE_NV_RAYTRACING
 	const GfxCapability& caps = Gfx_GetCapability();
-	if (caps.rayTracing)
+	if (caps.rayTracingNV)
 	{
 		m_nvRaytracing = new NVRaytracing();
 		m_mode = ShadowRenderMode::NV_ray_tracing;
@@ -122,19 +122,19 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	};
 
 	{
-		GfxVertexShaderRef modelVS;
-		modelVS.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.vert"))));
+		GfxOwn<GfxVertexShader> modelVS;
+		modelVS = Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.vert")));
 
-		GfxPixelShaderRef modelPS;
-		modelPS.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.frag"))));
+		GfxOwn<GfxPixelShader> modelPS;
+		modelPS = Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Model.frag")));
 
 		GfxVertexFormatDesc modelVFDesc;
 		modelVFDesc.add(0, GfxVertexFormatDesc::DataType::Float3, GfxVertexFormatDesc::Semantic::Position, 0);
 		modelVFDesc.add(0, GfxVertexFormatDesc::DataType::Float3, GfxVertexFormatDesc::Semantic::Normal, 0);
 		modelVFDesc.add(0, GfxVertexFormatDesc::DataType::Float2, GfxVertexFormatDesc::Semantic::Texcoord, 0);
 
-		GfxVertexFormatRef modelVF;
-		modelVF.takeover(Gfx_CreateVertexFormat(modelVFDesc));
+		GfxOwn<GfxVertexFormat> modelVF;
+		modelVF = Gfx_CreateVertexFormat(modelVFDesc);
 
 		GfxShaderBindingDesc bindings;
 		bindings.constantBuffers = 2;
@@ -144,8 +144,8 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 	}
 
 	{
-		GfxComputeShaderRef cs;
-		cs.takeover(Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.comp"))));
+		GfxOwn<GfxComputeShader> cs;
+		cs = Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.comp")));
 
 		GfxShaderBindingDesc bindings;
 		bindings.constantBuffers = 1;
@@ -153,19 +153,19 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		bindings.textures = 1;
 		bindings.rwImages = 1;
 		bindings.rwBuffers = 1;
-		m_techniqueRayTracedShadows = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), bindings));
+		m_techniqueRayTracedShadows = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), bindings, {8, 8, 1}));
 	}
 
 	{
-		GfxVertexFormatRef vf;
-		vf.takeover(Gfx_CreateVertexFormat(GfxVertexFormatDesc()));
+		GfxOwn<GfxVertexFormat> vf;
+		vf = Gfx_CreateVertexFormat(GfxVertexFormatDesc());
 
-		GfxVertexShaderRef vs;
-		vs.takeover(Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Blit.vert"))));
+		GfxOwn<GfxVertexShader> vs;
+		vs = Gfx_CreateVertexShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Blit.vert")));
 
 		{
-			GfxPixelShaderRef ps;
-			ps.takeover(Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Combine.frag"))));
+			GfxOwn<GfxPixelShader> ps;
+			ps = Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Combine.frag")));
 
 			GfxShaderBindingDesc bindings;
 			bindings.constantBuffers = 1;
@@ -187,12 +187,12 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 	{
 		GfxBufferDesc cbDesc(GfxBufferFlags::TransientConstant, GfxFormat_Unknown, 1, sizeof(ModelConstants));
-		m_modelGlobalConstantBuffer.takeover(Gfx_CreateBuffer(cbDesc));
+		m_modelGlobalConstantBuffer = Gfx_CreateBuffer(cbDesc);
 	}
 
 	{
 		GfxBufferDesc cbDesc(GfxBufferFlags::TransientConstant, GfxFormat_Unknown, 1, sizeof(RayTracingConstants));
-		m_rayTracingConstantBuffer.takeover(Gfx_CreateBuffer(cbDesc));
+		m_rayTracingConstantBuffer= Gfx_CreateBuffer(cbDesc);
 	}
 
 	if (g_appConfig.argc >= 2)
@@ -240,13 +240,6 @@ RayTracedShadowsApp::~RayTracedShadowsApp()
 #endif // USE_NV_RAYTRACING
 
 	m_windowEvents.setOwner(nullptr);
-
-	Gfx_Release(m_defaultWhiteTexture);
-	Gfx_Release(m_vertexBuffer);
-	Gfx_Release(m_indexBuffer);
-	Gfx_Release(m_techniqueModel);
-	Gfx_Release(m_techniqueRayTracedShadows);
-	Gfx_Release(m_techniqueCombine);
 }
 
 void RayTracedShadowsApp::update()
@@ -361,23 +354,23 @@ void RayTracedShadowsApp::createRenderTargets(Tuple2i size)
 
 	desc.format = GfxFormat_RGBA8_Unorm;
 	desc.usage = GfxUsageFlags::RenderTarget | GfxUsageFlags::ShaderResource;
-	m_gbufferBaseColor.takeover(Gfx_CreateTexture(desc));
+	m_gbufferBaseColor = Gfx_CreateTexture(desc);
 
 	desc.format = GfxFormat_RGBA16_Float;
 	desc.usage = GfxUsageFlags::RenderTarget | GfxUsageFlags::ShaderResource;
-	m_gbufferNormal.takeover(Gfx_CreateTexture(desc));
+	m_gbufferNormal = Gfx_CreateTexture(desc);
 
 	desc.format = GfxFormat_RGBA32_Float;
 	desc.usage = GfxUsageFlags::RenderTarget | GfxUsageFlags::ShaderResource;
-	m_gbufferPosition.takeover(Gfx_CreateTexture(desc));
+	m_gbufferPosition = Gfx_CreateTexture(desc);
 
 	desc.format = GfxFormat_D32_Float;
 	desc.usage = GfxUsageFlags::DepthStencil | GfxUsageFlags::ShaderResource;
-	m_gbufferDepth.takeover(Gfx_CreateTexture(desc));
+	m_gbufferDepth = Gfx_CreateTexture(desc);
 
 	desc.format = GfxFormat_R8_Unorm;
 	desc.usage = GfxUsageFlags::ShaderResource | GfxUsageFlags::StorageImage;
-	m_shadowMask.takeover(Gfx_CreateTexture(desc));
+	m_shadowMask = Gfx_CreateTexture(desc);
 }
 
 const char* toString(ShadowRenderMode mode)
@@ -398,8 +391,8 @@ void RayTracedShadowsApp::render()
 	if (m_nvRaytracingDirty && m_nvRaytracing)
 	{
 		m_nvRaytracing->build(m_ctx,
-			m_vertexBuffer, m_vertexCount, GfxFormat_RGB32_Float, u32(sizeof(Vertex)),
-			m_indexBuffer, m_indexCount, GfxFormat_R32_Uint);
+			m_vertexBuffer.get(), m_vertexCount, GfxFormat_RGB32_Float, u32(sizeof(Vertex)),
+			m_indexBuffer.get(), m_indexCount, GfxFormat_R32_Uint);
 		m_nvRaytracingDirty = false;
 	}
 #endif // USE_NV_RAYTRACING
@@ -526,7 +519,7 @@ void RayTracedShadowsApp::renderGbuffer()
 
 		for (const MeshSegment& segment : m_segments)
 		{
-			GfxTexture texture = m_defaultWhiteTexture;
+			GfxTexture texture = m_defaultWhiteTexture.get();
 
 			const Material& material = (segment.material == 0xFFFFFFFF) ? m_defaultMaterial : m_materials[segment.material];
 			if (material.albedoTexture.valid())
@@ -556,7 +549,7 @@ void RayTracedShadowsApp::renderShadowMask()
 	constants.lightDirection = Vec4(m_lightCamera.getForward(), 0.0f);
 	constants.cameraPosition = Vec4(m_interpolatedCamera.getPosition(), 0.0f);
 	constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
-	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);
+	Gfx_UpdateBufferT(m_ctx, m_rayTracingConstantBuffer, constants);
 
 	Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
 	Gfx_SetSampler(m_ctx, GfxStage::Compute, 0, m_samplerStates.pointClamp);
@@ -583,7 +576,7 @@ void RayTracedShadowsApp::renderShadowMaskNV()
 	constants.lightDirection = Vec4(m_lightCamera.getForward(), 0.0f);
 	constants.cameraPosition = Vec4(m_interpolatedCamera.getPosition(), 0.0f);
 	constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
-	Gfx_UpdateBuffer(m_ctx, m_rayTracingConstantBuffer, constants);
+	Gfx_UpdateBufferT(m_ctx, m_rayTracingConstantBuffer, constants);
 
 #if USE_NV_RAYTRACING
 	m_nvRaytracing->dispatch(m_ctx, 
@@ -668,8 +661,7 @@ GfxRef<GfxTexture> RayTracedShadowsApp::loadTexture(const std::string& filename)
 
 			GfxTextureDesc desc = GfxTextureDesc::make2D(w, h);
 			desc.mips = (u32)textureData.size();
-
-			texture.takeover(Gfx_CreateTexture(desc, textureData.data(), (u32)textureData.size()));
+			texture.retain(Gfx_CreateTexture(desc, textureData.data(), (u32)textureData.size()));
 			m_textures.insert(std::make_pair(filename, texture));
 
 			stbi_image_free(pixels);
@@ -959,7 +951,7 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 	{
 		MaterialConstants constants;
 		constants.baseColor = Vec4(1.0f);
-		m_defaultMaterial.constantBuffer.takeover(Gfx_CreateBuffer(materialCbDesc, &constants));
+		m_defaultMaterial.constantBuffer.retain(Gfx_CreateBuffer(materialCbDesc, &constants));
 		m_defaultMaterial.albedoTexture.retain(m_defaultWhiteTexture);
 	}
 
@@ -987,7 +979,7 @@ bool RayTracedShadowsApp::loadModel(const char* filename)
 		desc.format = GfxFormat_Unknown;
 		desc.stride = sizeof(bvhBuilder.m_packedNodes[0]);
 		desc.count = (u32)bvhBuilder.m_packedNodes.size();
-		m_bvhBuffer.takeover(Gfx_CreateBuffer(desc, bvhBuilder.m_packedNodes.data()));
+		m_bvhBuffer = Gfx_CreateBuffer(desc, bvhBuilder.m_packedNodes.data());
 	}
 
 #if USE_NV_RAYTRACING

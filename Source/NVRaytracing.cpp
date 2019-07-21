@@ -1,6 +1,6 @@
 #include "NVRaytracing.h"
 #include <Rush/MathCommon.h>
-#include <Rush/UtilStaticArray.h>
+#include <Rush/UtilArray.h>
 
 #define V(x)                                                                                                           \
 	{                                                                                                                  \
@@ -318,8 +318,8 @@ void NVRaytracing::build(GfxContext * ctx,
 	instanceBufferDesc.count = 1;
 	instanceBufferDesc.stride = sizeof(instanceData);
 
-	GfxBuffer instanceBuffer = Gfx_CreateBuffer(instanceBufferDesc, &instanceData);
-	BufferVK& instanceBufferVK = device->m_buffers[instanceBuffer];
+	GfxOwn<GfxBuffer> instanceBuffer = Gfx_CreateBuffer(instanceBufferDesc, &instanceData);
+	BufferVK& instanceBufferVK = device->m_buffers[instanceBuffer.get()];
 
 	VkBuffer instanceDataBuffer = VK_NULL_HANDLE;
 	vkCmdBuildAccelerationStructureNV(ctx->m_commandBuffer,
@@ -345,12 +345,12 @@ void NVRaytracing::dispatch(GfxContext* ctx,
 	VkDevice vulkanDevice = device->m_vulkanDevice;
 
 	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-	allocInfo.descriptorPool = device->m_currentFrame->descriptorPool;
+	allocInfo.descriptorPool = device->m_currentFrame->currentDescriptorPool;
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pSetLayouts = &m_descriptorSetLayout;
 
 	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-	V(vkAllocateDescriptorSets(vulkanDevice, &allocInfo, &descriptorSet));
+	V(vkAllocateDescriptorSets(vulkanDevice, &allocInfo, &descriptorSet)); // TODO: handle descriptor pool OOM
 
 	StaticArray<VkWriteDescriptorSet, 5> descriptors;
 
@@ -437,7 +437,7 @@ void NVRaytracing::dispatch(GfxContext* ctx,
 		m_pipelineLayout, 0, 1, &descriptorSet,
 		0, nullptr);
 
-	const BufferVK& sbtBufferVK = device->m_buffers[m_sbtBuffer];
+	const BufferVK& sbtBufferVK = device->m_buffers[m_sbtBuffer.get()];
 	VkBuffer sbtBuffer = sbtBufferVK.info.buffer;
 
 	vkCmdTraceRaysNV(ctx->m_commandBuffer,
@@ -455,7 +455,7 @@ void NVRaytracing::reset()
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
 
-	Gfx_DestroyBuffer(m_sbtBuffer);
+	m_sbtBuffer.reset();
 
 	// TODO: Enqueue destruction to avoid wait-for-idle
 

@@ -3,11 +3,9 @@
 #include <Rush/GfxBitmapFont.h>
 #include <Rush/GfxDevice.h>
 #include <Rush/GfxPrimitiveBatch.h>
-#include <Rush/GfxRef.h>
 #include <Rush/MathTypes.h>
 #include <Rush/Platform.h>
 #include <Rush/UtilCamera.h>
-#include <Rush/UtilCameraManipulator.h>
 #include <Rush/UtilTimer.h>
 #include <Rush/Window.h>
 
@@ -84,18 +82,18 @@ private:
 
 	CameraManipulator m_cameraMan;
 
-	GfxTechnique m_techniqueModel;
-	GfxTechnique m_techniqueRayTracedShadows;
-	GfxTechnique m_techniqueCombine;
+	GfxOwn<GfxTechnique> m_techniqueModel;
+	GfxOwn<GfxTechnique> m_techniqueRayTracedShadows;
+	GfxOwn<GfxTechnique> m_techniqueCombine;
 
-	GfxTexture m_defaultWhiteTexture;
+	GfxOwn<GfxTexture> m_defaultWhiteTexture;
 
-	GfxBuffer m_vertexBuffer;
-	GfxBuffer m_indexBuffer;
+	GfxOwn<GfxBuffer> m_vertexBuffer;
+	GfxOwn<GfxBuffer> m_indexBuffer;
 
-	GfxBufferRef m_modelGlobalConstantBuffer;
+	GfxOwn<GfxBuffer> m_modelGlobalConstantBuffer;
 
-	GfxBufferRef m_rayTracingConstantBuffer;
+	GfxOwn<GfxBuffer> m_rayTracingConstantBuffer;
 
 	Mat4 m_matViewProj = Mat4::identity();
 	Mat4 m_matViewProjInv = Mat4::identity();
@@ -124,14 +122,14 @@ private:
 	std::string m_statusString;
 	bool m_valid = false;
 
-	std::unordered_map<std::string, GfxTextureRef> m_textures;
+	std::unordered_map<std::string, GfxRef<GfxTexture>> m_textures;
 	std::unordered_map<u64, GfxRef<GfxBuffer>> m_materialConstantBuffers;
 
-	GfxTextureRef m_shadowMask;
-	GfxTextureRef m_gbufferDepth;
-	GfxTextureRef m_gbufferNormal;
-	GfxTextureRef m_gbufferPosition;
-	GfxTextureRef m_gbufferBaseColor;
+	GfxOwn<GfxTexture> m_shadowMask;
+	GfxOwn<GfxTexture> m_gbufferDepth;
+	GfxOwn<GfxTexture> m_gbufferNormal;
+	GfxOwn<GfxTexture> m_gbufferPosition;
+	GfxOwn<GfxTexture> m_gbufferBaseColor;
 
 	struct MaterialConstants
 	{
@@ -140,8 +138,8 @@ private:
 
 	struct Material
 	{
-		GfxTextureRef albedoTexture;
-		GfxBufferRef constantBuffer;
+		GfxRef<GfxTexture> albedoTexture;
+		GfxRef<GfxBuffer> constantBuffer;
 	};
 
 	std::vector<Material> m_materials;
@@ -160,7 +158,7 @@ private:
 
 	float m_cameraScale = 1.0f;
 
-	GfxBufferRef m_bvhBuffer;
+	GfxOwn<GfxBuffer> m_bvhBuffer;
 
 	Vec2 m_prevMousePos = Vec2(0.0f);
 

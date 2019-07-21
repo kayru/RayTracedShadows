@@ -21,7 +21,7 @@ BaseApplication::BaseApplication()
 		desc.enable      = false;
 		desc.writeEnable = false;
 		desc.compareFunc = GfxCompareFunc::Always;
-		m_depthStencilStates.disable.takeover(Gfx_CreateDepthStencilState(desc));
+		m_depthStencilStates.disable = Gfx_CreateDepthStencilState(desc);
 	}
 
 	{
@@ -29,7 +29,7 @@ BaseApplication::BaseApplication()
 		desc.enable      = true;
 		desc.writeEnable = true;
 		desc.compareFunc = GfxCompareFunc::LessEqual;
-		m_depthStencilStates.writeLessEqual.takeover(Gfx_CreateDepthStencilState(desc));
+		m_depthStencilStates.writeLessEqual = Gfx_CreateDepthStencilState(desc);
 	}
 
 	{
@@ -37,7 +37,7 @@ BaseApplication::BaseApplication()
 		desc.enable      = true;
 		desc.writeEnable = true;
 		desc.compareFunc = GfxCompareFunc::Always;
-		m_depthStencilStates.writeAlways.takeover(Gfx_CreateDepthStencilState(desc));
+		m_depthStencilStates.writeAlways = Gfx_CreateDepthStencilState(desc);
 	}
 
 	{
@@ -45,24 +45,24 @@ BaseApplication::BaseApplication()
 		desc.enable      = true;
 		desc.writeEnable = false;
 		desc.compareFunc = GfxCompareFunc::LessEqual;
-		m_depthStencilStates.testLessEqual.takeover(Gfx_CreateDepthStencilState(desc));
+		m_depthStencilStates.testLessEqual = Gfx_CreateDepthStencilState(desc);
 	}
 
 	// Blend states
 
 	{
 		GfxBlendStateDesc desc = GfxBlendStateDesc::makeOpaque();
-		m_blendStates.opaque.takeover(Gfx_CreateBlendState(desc));
+		m_blendStates.opaque = Gfx_CreateBlendState(desc);
 	}
 
 	{
 		GfxBlendStateDesc desc = GfxBlendStateDesc::makeLerp();
-		m_blendStates.lerp.takeover(Gfx_CreateBlendState(desc));
+		m_blendStates.lerp = Gfx_CreateBlendState(desc);
 	}
 
 	{
 		GfxBlendStateDesc desc = GfxBlendStateDesc::makeAdditive();
-		m_blendStates.additive.takeover(Gfx_CreateBlendState(desc));
+		m_blendStates.additive = Gfx_CreateBlendState(desc);
 	}
 
 	// Sampler states
@@ -72,7 +72,7 @@ BaseApplication::BaseApplication()
 		desc.wrapU          = GfxTextureWrap::Clamp;
 		desc.wrapV          = GfxTextureWrap::Clamp;
 		desc.wrapW          = GfxTextureWrap::Clamp;
-		m_samplerStates.pointClamp.takeover(Gfx_CreateSamplerState(desc));
+		m_samplerStates.pointClamp = Gfx_CreateSamplerState(desc);
 	}
 
 	{
@@ -80,7 +80,7 @@ BaseApplication::BaseApplication()
 		desc.wrapU          = GfxTextureWrap::Clamp;
 		desc.wrapV          = GfxTextureWrap::Clamp;
 		desc.wrapW          = GfxTextureWrap::Clamp;
-		m_samplerStates.linearClamp.takeover(Gfx_CreateSamplerState(desc));
+		m_samplerStates.linearClamp = Gfx_CreateSamplerState(desc);
 	}
 
 	{
@@ -88,7 +88,7 @@ BaseApplication::BaseApplication()
 		desc.wrapU          = GfxTextureWrap::Wrap;
 		desc.wrapV          = GfxTextureWrap::Wrap;
 		desc.wrapW          = GfxTextureWrap::Wrap;
-		m_samplerStates.linearWrap.takeover(Gfx_CreateSamplerState(desc));
+		m_samplerStates.linearWrap = Gfx_CreateSamplerState(desc);
 	}
 
 	{
@@ -97,7 +97,7 @@ BaseApplication::BaseApplication()
 		desc.wrapV          = GfxTextureWrap::Wrap;
 		desc.wrapW          = GfxTextureWrap::Wrap;
 		desc.anisotropy     = 4.0f;
-		m_samplerStates.anisotropicWrap.takeover(Gfx_CreateSamplerState(desc));
+		m_samplerStates.anisotropicWrap = Gfx_CreateSamplerState(desc);
 	}
 }
 

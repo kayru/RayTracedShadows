@@ -49,7 +49,7 @@ public:
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	VkPipeline m_pipeline = VK_NULL_HANDLE;
 
-	GfxBuffer m_sbtBuffer;
+	GfxOwn<GfxBuffer> m_sbtBuffer;
 
 	u32 m_sbtRaygenOffset = 0;
 	u32 m_sbtMissOffset = 0;
