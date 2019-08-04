@@ -1,3 +1,15 @@
+set(app RayTracedShadows)
+
+add_executable(${app}
+	BaseApplication.cpp
+	BaseApplication.h
+	BVHBuilder.cpp
+	BVHBuilder.h
+	MovingAverage.h
+	RayTracedShadows.cpp
+	RayTracedShadows.h
+)
+
 set(shaderDependencies
 	# Add explicit dependencies here
 )
@@ -10,30 +22,25 @@ set(shaders
 	Shaders/RayTracedShadows.comp
 )
 
-if (${RUSH_RENDER_API} MATCHES "VK")
+if (USE_NV_RAYTRACING)
 	set(shaders ${shaders}
 		Shaders/RayTracedShadowsNV.rgen
 		Shaders/RayTracedShadowsNV.rmiss
 	)
+	target_sources(${app} PRIVATE
+		NVRaytracing.h
+		NVRaytracing.cpp
+	)
+	target_compile_definitions(${app} PRIVATE
+		USE_NV_RAYTRACING=1
+	)
+else()
+	target_compile_definitions(${app} PRIVATE
+		USE_NV_RAYTRACING=0
+	)
 endif()
 
-set(src
-	${shaders}
-	BaseApplication.cpp
-	BaseApplication.h
-	BVHBuilder.cpp
-	BVHBuilder.h
-	MovingAverage.h
-	RayTracedShadows.cpp
-	RayTracedShadows.h
-)
-
-set(app RayTracedShadows)
-
-add_executable(${app}
-	${src}
-)
-
+target_sources(${app} PRIVATE ${shaders})
 source_group("Shaders" FILES ${shaders} ${shaderDependencies})
 
 find_program(GLSLC NAMES glslc NO_SYSTEM_ENVIRONMENT_PATH PATHS
@@ -74,16 +81,6 @@ endif()
 foreach(shader ${shaders})
 	shader_compile_rule(${shader} "${shaderDependencies}")
 endforeach()
-
-if (${RUSH_RENDER_API} MATCHES "VK")
-	target_compile_definitions(${app} PRIVATE
-		USE_NV_RAYTRACING=1
-	)
-	target_sources(${app} PRIVATE
-		NVRaytracing.h
-		NVRaytracing.cpp
-	)
-endif()
 
 target_compile_definitions(${app} PRIVATE
 	RUSH_USING_NAMESPACE # Automatically use Rush namespace
