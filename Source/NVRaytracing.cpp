@@ -14,140 +14,35 @@ void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSo
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
 
-	{
-		VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-		moduleCreateInfo.codeSize = rgen.size();
-		moduleCreateInfo.pCode = (const u32*)rgen.data();
-		V(vkCreateShaderModule(vulkanDevice, &moduleCreateInfo, nullptr, &m_rayGenShader));
-	}
+	GfxRayTracingPipelineDesc desc;
+	desc.rayGen = rgen;
+	desc.miss = rmiss;
+	desc.bindings.constantBuffers = 1;
+	desc.bindings.samplers = 1;
+	desc.bindings.textures = 1;
+	desc.bindings.rwImages = 1;
+	desc.bindings.accelerationStructures = 1;
 
-	{
-		VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-		moduleCreateInfo.codeSize = rmiss.size();
-		moduleCreateInfo.pCode = (const u32*)rmiss.data();
-		V(vkCreateShaderModule(vulkanDevice, &moduleCreateInfo, nullptr, &m_rayMissShader));
-	}
+	m_rtPipeline = Gfx_CreateRayTracingPipeline(desc);
 
-	// create descriptor set layout
+	// TODO: get the native pipeline out of the device while abstraction layer is WIP
+	RayTracingPipelineVK& pipeline = device->m_rayTracingPipelines[m_rtPipeline.get()];
 
-	VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+	const u32 shaderHandleSize = device->m_nvRayTracingProps.shaderGroupHandleSize;
 
-	StaticArray<VkDescriptorSetLayoutBinding, 5> bindings; // TODO: configurable bindings based on GfxShaderBindingDesc
+	m_sbtMissStride = shaderHandleSize;
+	m_sbtHitStride = shaderHandleSize;
 
-	{
-		VkDescriptorSetLayoutBinding item = {};
-		item.binding = 0;
-		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-		bindings.pushBack(item);
-	}
-
-	{
-		VkDescriptorSetLayoutBinding item = {};
-		item.binding = 1;
-		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-		bindings.pushBack(item);
-	}
-
-	{
-		VkDescriptorSetLayoutBinding item = {};
-		item.binding = 2;
-		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-		bindings.pushBack(item);
-	}
-
-	{
-		VkDescriptorSetLayoutBinding item = {};
-		item.binding = 3;
-		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-		bindings.pushBack(item);
-	}
-
-	{
-		VkDescriptorSetLayoutBinding item = {};
-		item.binding = 4;
-		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
-		item.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-		bindings.pushBack(item);
-	}
-
-	descriptorSetLayoutCreateInfo.bindingCount = u32(bindings.currentSize);
-	descriptorSetLayoutCreateInfo.pBindings = bindings.data;
-	V(vkCreateDescriptorSetLayout(vulkanDevice, &descriptorSetLayoutCreateInfo, nullptr, &m_descriptorSetLayout));
-
-	// create pipeline layout
-
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-	pipelineLayoutCreateInfo.setLayoutCount = 1;
-	pipelineLayoutCreateInfo.pSetLayouts = &m_descriptorSetLayout;
-
-	V(vkCreatePipelineLayout(vulkanDevice, &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout));
-
-	// create pipeline
-
-	VkRayTracingPipelineCreateInfoNV createInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV };
-
-	VkPipelineShaderStageCreateInfo shaderStages[2] = {};
-	VkRayTracingShaderGroupCreateInfoNV shaderGroups[2] = {};
-
-	shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-	shaderStages[0].module = m_rayGenShader;
-	shaderStages[0].pName = "main";
-
-	shaderGroups[0].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV;
-	shaderGroups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
-	shaderGroups[0].generalShader = 0;
-
-	shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStages[1].stage = VK_SHADER_STAGE_MISS_BIT_NV;
-	shaderStages[1].module = m_rayMissShader;
-	shaderStages[1].pName = "main";
-
-	shaderGroups[1].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV;
-	shaderGroups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
-	shaderGroups[1].generalShader = 1;
-
-	createInfo.stageCount = 2;
-	createInfo.pStages = shaderStages;
-
-	createInfo.groupCount = 2;
-	createInfo.pGroups = shaderGroups;
-	
-	createInfo.maxRecursionDepth = 1;
-
-	createInfo.layout = m_pipelineLayout;
-
-	V(vkCreateRayTracingPipelinesNV(vulkanDevice,
-		device->m_pipelineCache,
-		1, &createInfo, nullptr, &m_pipeline));
-
-	m_shaderHandleSize = device->m_nvRayTracingProps.shaderGroupHandleSize;
-	m_shaderHandles.resize(m_shaderHandleSize * createInfo.groupCount);
-
-	vkGetRayTracingShaderGroupHandlesNV(vulkanDevice, m_pipeline,
-		0, createInfo.groupCount, u32(m_shaderHandles.size()), m_shaderHandles.data());
-
-	m_sbtMissStride = m_shaderHandleSize;
-	m_sbtHitStride = m_shaderHandleSize;
-
-	m_sbtRaygenOffset = 0 * m_shaderHandleSize;
-	m_sbtMissOffset = 1 * m_shaderHandleSize;
+	// TODO: add API to get handles for specific shaders
+	m_sbtRaygenOffset = 0 * shaderHandleSize;
+	m_sbtMissOffset = 1 * shaderHandleSize;
 
 	GfxBufferDesc sbtBufferDesc;
 	sbtBufferDesc.flags = GfxBufferFlags::None;
-	sbtBufferDesc.count = createInfo.groupCount;
-	sbtBufferDesc.stride = m_shaderHandleSize;
+	sbtBufferDesc.count = pipeline.shaderHandles.size() / shaderHandleSize;
+	sbtBufferDesc.stride = shaderHandleSize;
 
-	m_sbtBuffer = Gfx_CreateBuffer(sbtBufferDesc, m_shaderHandles.data());
+	m_sbtBuffer = Gfx_CreateBuffer(sbtBufferDesc, pipeline.shaderHandles.data());
 }
 
 void NVRaytracing::build(GfxContext * ctx,
@@ -344,10 +239,13 @@ void NVRaytracing::dispatch(GfxContext* ctx,
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
 
+	// TODO: get the native pipeline out of the device while abstraction layer is WIP
+	RayTracingPipelineVK& pipeline = device->m_rayTracingPipelines[m_rtPipeline.get()];
+
 	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	allocInfo.descriptorPool = device->m_currentFrame->currentDescriptorPool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &m_descriptorSetLayout;
+	allocInfo.descriptorSetCount = u32(pipeline.setLayouts.size());
+	allocInfo.pSetLayouts = pipeline.setLayouts.data;
 
 	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	V(vkAllocateDescriptorSets(vulkanDevice, &allocInfo, &descriptorSet)); // TODO: handle descriptor pool OOM
@@ -359,7 +257,7 @@ void NVRaytracing::dispatch(GfxContext* ctx,
 		item.dstSet = descriptorSet;
 		item.dstBinding = 0;
 		item.descriptorCount = 1;
-		item.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		item.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		item.pBufferInfo = &device->m_buffers[constants].info;
 		descriptors.pushBack(item);
 	}
@@ -430,12 +328,13 @@ void NVRaytracing::dispatch(GfxContext* ctx,
 
 	vkCmdBindPipeline(ctx->m_commandBuffer,
 		VK_PIPELINE_BIND_POINT_RAY_TRACING_NV,
-		m_pipeline);
+		pipeline.pipeline);
 
+	u32 dynamicOffsets[1] = { 0 };
 	vkCmdBindDescriptorSets(ctx->m_commandBuffer,
 		VK_PIPELINE_BIND_POINT_RAY_TRACING_NV,
-		m_pipelineLayout, 0, 1, &descriptorSet,
-		0, nullptr);
+		pipeline.pipelineLayout, 0, 1, &descriptorSet,
+		RUSH_COUNTOF(dynamicOffsets), dynamicOffsets);
 
 	const BufferVK& sbtBufferVK = device->m_buffers[m_sbtBuffer.get()];
 	VkBuffer sbtBuffer = sbtBufferVK.info.buffer;
@@ -460,14 +359,6 @@ void NVRaytracing::reset()
 	// TODO: Enqueue destruction to avoid wait-for-idle
 
 	vkDeviceWaitIdle(vulkanDevice);
-
-	vkDestroyShaderModule(vulkanDevice, m_rayGenShader, nullptr);
-	vkDestroyShaderModule(vulkanDevice, m_rayMissShader, nullptr);
-
-	vkDestroyDescriptorSetLayout(vulkanDevice, m_descriptorSetLayout, nullptr);
-	vkDestroyPipelineLayout(vulkanDevice, m_pipelineLayout, nullptr);
-
-	vkDestroyPipeline(vulkanDevice, m_pipeline, nullptr);
 
 	vkFreeMemory(vulkanDevice, m_memory, nullptr);
 	vkFreeMemory(vulkanDevice, m_scratchMemory, nullptr);

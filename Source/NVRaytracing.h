@@ -39,15 +39,7 @@ public:
 
 	// Pipeline and SBT
 
-	VkShaderModule m_rayGenShader = VK_NULL_HANDLE;
-	VkShaderModule m_rayMissShader = VK_NULL_HANDLE;
-	u32 m_shaderHandleSize = 0;
-	std::vector<u8> m_shaderHandles;
-	u8* getShaderHandlePtr(u32 index) { return &m_shaderHandles[m_shaderHandleSize * index]; }
-
-	VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
-	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-	VkPipeline m_pipeline = VK_NULL_HANDLE;
+	GfxOwn<GfxRayTracingPipeline> m_rtPipeline;
 
 	GfxOwn<GfxBuffer> m_sbtBuffer;
 
