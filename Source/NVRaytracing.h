@@ -24,18 +24,8 @@ public:
 		GfxTexture positionTexture,
 		GfxTexture outputShadowMask);
 
-	void reset();
-
-	VkAccelerationStructureNV m_blas = VK_NULL_HANDLE;
-	VkAccelerationStructureNV m_tlas = VK_NULL_HANDLE;
-
-	VkDeviceMemory m_memory = VK_NULL_HANDLE;
-	u32 m_blasMemoryOffset = 0;
-	u32 m_tlasMemoryOffset = 0;
-
-	VkBuffer m_scratchBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory m_scratchMemory = VK_NULL_HANDLE;
-	u32 m_scratchBufferSize = 0;
+	GfxOwn<GfxAccelerationStructure> m_blas;
+	GfxOwn<GfxAccelerationStructure> m_tlas;
 
 	// Pipeline and SBT
 
@@ -48,5 +38,10 @@ public:
 	u32 m_sbtMissStride = 0;
 	u32 m_sbtHitOffset = 0;
 	u32 m_sbtHitStride = 0;
+private:
+
+
+	void reset();
+
 };
 
