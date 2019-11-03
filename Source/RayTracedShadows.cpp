@@ -427,10 +427,10 @@ void RayTracedShadowsApp::render()
 		Gfx_SetDepthStencilState(m_ctx, m_depthStencilStates.disable);
 		Gfx_SetBlendState(m_ctx, m_blendStates.opaque);
 		Gfx_SetTechnique(m_ctx, m_techniqueCombine);
-		Gfx_SetSampler(m_ctx, GfxStage::Pixel, 0, m_samplerStates.pointClamp);
-		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 0, m_gbufferBaseColor);
-		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 1, m_gbufferNormal);
-		Gfx_SetTexture(m_ctx, GfxStage::Pixel, 2, m_shadowMask);
+		Gfx_SetSampler(m_ctx, 0, m_samplerStates.pointClamp);
+		Gfx_SetTexture(m_ctx, 0, m_gbufferBaseColor);
+		Gfx_SetTexture(m_ctx, 1, m_gbufferNormal);
+		Gfx_SetTexture(m_ctx, 2, m_shadowMask);
 		Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
 		Gfx_Draw(m_ctx, 0, 3);
 	}
@@ -528,8 +528,8 @@ void RayTracedShadowsApp::renderGbuffer()
 			}
 			Gfx_SetConstantBuffer(m_ctx, 1, material.constantBuffer);
 
-			Gfx_SetSampler(m_ctx, GfxStage::Pixel, 0, m_samplerStates.anisotropicWrap);
-			Gfx_SetTexture(m_ctx, GfxStage::Pixel, 0, texture);
+			Gfx_SetSampler(m_ctx, 0, m_samplerStates.anisotropicWrap);
+			Gfx_SetTexture(m_ctx, 0, texture);
 			Gfx_DrawIndexed(m_ctx, segment.indexCount, segment.indexOffset, 0, m_vertexCount);
 		}
 	}
@@ -552,8 +552,8 @@ void RayTracedShadowsApp::renderShadowMask()
 	Gfx_UpdateBufferT(m_ctx, m_rayTracingConstantBuffer, constants);
 
 	Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
-	Gfx_SetSampler(m_ctx, GfxStage::Compute, 0, m_samplerStates.pointClamp);
-	Gfx_SetTexture(m_ctx, GfxStage::Compute, 0, m_gbufferPosition);
+	Gfx_SetSampler(m_ctx, 0, m_samplerStates.pointClamp);
+	Gfx_SetTexture(m_ctx, 0, m_gbufferPosition);
 	Gfx_SetStorageImage(m_ctx, 0, m_shadowMask);
 	Gfx_SetStorageBuffer(m_ctx, 0, m_bvhBuffer);
 	Gfx_SetTechnique(m_ctx, m_techniqueRayTracedShadows);

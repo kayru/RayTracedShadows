@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Rush/GfxCommon.h>
-#include <Rush/GfxDeviceVK.h>
 
 #include <vector>
 
@@ -29,15 +28,9 @@ public:
 
 	// Pipeline and SBT
 
-	GfxOwn<GfxRayTracingPipeline> m_rtPipeline;
-
+	GfxOwn<GfxRayTracingPipeline> m_pipeline;
 	GfxOwn<GfxBuffer> m_sbtBuffer;
 
-	u32 m_sbtRaygenOffset = 0;
-	u32 m_sbtMissOffset = 0;
-	u32 m_sbtMissStride = 0;
-	u32 m_sbtHitOffset = 0;
-	u32 m_sbtHitStride = 0;
 private:
 
 
