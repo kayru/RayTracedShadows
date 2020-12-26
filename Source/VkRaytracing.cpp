@@ -1,16 +1,9 @@
-#include "NVRaytracing.h"
+#include "VkRaytracing.h"
 #include <Rush/GfxDeviceVK.h>
 #include <Rush/MathCommon.h>
 #include <Rush/UtilArray.h>
 
-#define V(x)                                                                                                           \
-	{                                                                                                                  \
-		auto s = x;                                                                                                    \
-		RUSH_UNUSED(s);                                                                                                \
-		RUSH_ASSERT_MSG(s == VK_SUCCESS, #x " call failed");                                                           \
-	}
-
-void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss)
+void VkRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss)
 {
 	GfxDevice* device = Platform_GetGfxDevice();
 	VkDevice vulkanDevice = device->m_vulkanDevice;
@@ -18,11 +11,11 @@ void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSo
 	GfxRayTracingPipelineDesc desc;
 	desc.rayGen = rgen;
 	desc.miss = rmiss;
-	desc.bindings.constantBuffers = 1;
-	desc.bindings.samplers = 1;
-	desc.bindings.textures = 1;
-	desc.bindings.rwImages = 1;
-	desc.bindings.accelerationStructures = 1;
+	desc.bindings.descriptorSets[0].constantBuffers = 1;
+	desc.bindings.descriptorSets[0].samplers = 1;
+	desc.bindings.descriptorSets[0].textures = 1;
+	desc.bindings.descriptorSets[0].rwImages = 1;
+	desc.bindings.descriptorSets[0].accelerationStructures = 1;
 
 	m_pipeline = Gfx_CreateRayTracingPipeline(desc);
 
@@ -40,7 +33,7 @@ void NVRaytracing::createPipeline(const GfxShaderSource& rgen, const GfxShaderSo
 	m_sbtBuffer = Gfx_CreateBuffer(sbtBufferDesc, pipeline.shaderHandles.data());
 }
 
-void NVRaytracing::build(GfxContext* ctx,
+void VkRaytracing::build(GfxContext* ctx,
 	GfxBuffer vertexBuffer, u32 vertexCount, GfxFormat positionFormat, u32 vertexStride,
 	GfxBuffer indexBuffer, u32 indexCount, GfxFormat indexFormat)
 {
@@ -76,13 +69,13 @@ void NVRaytracing::build(GfxContext* ctx,
 	}
 
 	Gfx_BuildAccelerationStructure(ctx, m_blas);
-	Gfx_vkFullPipelineBarrier(ctx);
+	Gfx_AddFullPipelineBarrier(ctx);
 
 	Gfx_BuildAccelerationStructure(ctx, m_tlas, instanceBuffer);
-	Gfx_vkFullPipelineBarrier(ctx);
+	Gfx_AddFullPipelineBarrier(ctx);
 }
 
-void NVRaytracing::dispatch(GfxContext* ctx,
+void VkRaytracing::dispatch(GfxContext* ctx,
 	u32 width, u32 height,
 	GfxBuffer constants,
 	GfxSampler pointSampler,
@@ -96,7 +89,7 @@ void NVRaytracing::dispatch(GfxContext* ctx,
 	Gfx_TraceRays(ctx, m_pipeline, m_tlas, m_sbtBuffer, width, height, 1);
 }
 
-void NVRaytracing::reset()
+void VkRaytracing::reset()
 {
 	// TODO: Enqueue destruction to avoid wait-for-idle
 	Gfx_Finish();

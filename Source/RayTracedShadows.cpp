@@ -74,10 +74,10 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 
 #if USE_NV_RAYTRACING
 	const GfxCapability& caps = Gfx_GetCapability();
-	if (caps.rayTracingNV)
+	if (caps.rayTracing)
 	{
 		m_nvRaytracing = new NVRaytracing();
-		m_mode = ShadowRenderMode::NV_ray_tracing;
+		m_mode = ShadowRenderMode::Hardware;
 	}
 #endif // USE_NV_RAYTRACING
 
@@ -108,7 +108,7 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		FileIn f(fullFilename.c_str());
 		if (f.valid())
 		{
-			u32 fileSize = f.length();
+			u32 fileSize = (u32)f.length();
 			source.resize(fileSize + (isText ? 1 : 0), 0);
 			f.read(&source[0], fileSize);
 		}
@@ -137,9 +137,9 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		modelVF = Gfx_CreateVertexFormat(modelVFDesc);
 
 		GfxShaderBindingDesc bindings;
-		bindings.constantBuffers = 2;
-		bindings.samplers = 1;
-		bindings.textures = 1;
+		bindings.descriptorSets[0].constantBuffers = 2;
+		bindings.descriptorSets[0].samplers = 1;
+		bindings.descriptorSets[0].textures = 1;
 		m_techniqueModel = Gfx_CreateTechnique(GfxTechniqueDesc(modelPS.get(), modelVS.get(), modelVF.get(), bindings));
 	}
 
@@ -148,11 +148,11 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		cs = Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.comp")));
 
 		GfxShaderBindingDesc bindings;
-		bindings.constantBuffers = 1;
-		bindings.samplers = 1;
-		bindings.textures = 1;
-		bindings.rwImages = 1;
-		bindings.rwBuffers = 1;
+		bindings.descriptorSets[0].constantBuffers = 1;
+		bindings.descriptorSets[0].samplers = 1;
+		bindings.descriptorSets[0].textures = 1;
+		bindings.descriptorSets[0].rwImages = 1;
+		bindings.descriptorSets[0].rwBuffers = 1;
 		m_techniqueRayTracedShadows = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), bindings, {8, 8, 1}));
 	}
 
@@ -168,9 +168,9 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 			ps = Gfx_CreatePixelShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/Combine.frag")));
 
 			GfxShaderBindingDesc bindings;
-			bindings.constantBuffers = 1;
-			bindings.samplers = 1;
-			bindings.textures = 3;
+			bindings.descriptorSets[0].constantBuffers = 1;
+			bindings.descriptorSets[0].samplers = 1;
+			bindings.descriptorSets[0].textures = 3;
 			m_techniqueCombine = Gfx_CreateTechnique(GfxTechniqueDesc(ps.get(), vs.get(), vf.get(), bindings));
 		}
 	}
@@ -269,7 +269,7 @@ void RayTracedShadowsApp::update()
 			}
 			else if (e.code == Key_2)
 			{
-				m_mode = ShadowRenderMode::NV_ray_tracing;
+				m_mode = ShadowRenderMode::Hardware;
 			}
 			break;
 		case WindowEventType_Resize:
@@ -335,7 +335,7 @@ void RayTracedShadowsApp::update()
 	const GfxCapability& caps = Gfx_GetCapability();
 
 	Mat4 matView = m_interpolatedCamera.buildViewMatrix();
-	Mat4 matProj = m_interpolatedCamera.buildProjMatrix(caps.projectionFlags);
+	Mat4 matProj = m_interpolatedCamera.buildProjMatrix();
 	m_matViewProj = matView * matProj;
 	m_matViewProjInv = m_matViewProj.inverse();
 
@@ -378,7 +378,7 @@ const char* toString(ShadowRenderMode mode)
 	switch (mode)
 	{
 	case ShadowRenderMode::Compute: return "Compute";
-	case ShadowRenderMode::NV_ray_tracing: return "NV_ray_tracing";
+	case ShadowRenderMode::Hardware: return "Hardware";
 	default:
 		RUSH_BREAK;
 		return "unknown";
@@ -401,13 +401,13 @@ void RayTracedShadowsApp::render()
 	{
 		renderGbuffer();
 
-		if (m_mode == ShadowRenderMode::NV_ray_tracing)
+		if (m_mode == ShadowRenderMode::Hardware)
 		{
-			renderShadowMaskNV();
+			renderShadowMaskHardware();
 		}
 		else
 		{
-			renderShadowMask();
+			renderShadowMaskCompute();
 		}
 	}
 
@@ -538,7 +538,7 @@ void RayTracedShadowsApp::renderGbuffer()
 	Gfx_EndPass(m_ctx);
 }
 
-void RayTracedShadowsApp::renderShadowMask()
+void RayTracedShadowsApp::renderShadowMaskCompute()
 {
 	Gfx_BeginTimer(m_ctx, Timestamp_Shadows);
 
@@ -565,7 +565,7 @@ void RayTracedShadowsApp::renderShadowMask()
 	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
 }
 
-void RayTracedShadowsApp::renderShadowMaskNV()
+void RayTracedShadowsApp::renderShadowMaskHardware()
 {
 	Gfx_BeginTimer(m_ctx, Timestamp_Shadows);
 

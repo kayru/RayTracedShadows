@@ -23,7 +23,7 @@ class NVRaytracing;
 enum class ShadowRenderMode
 {
 	Compute,
-	NV_ray_tracing,
+	Hardware,
 };
 
 class RayTracedShadowsApp : public BaseApplication
@@ -58,8 +58,8 @@ private:
 		Vec4 renderTargetSize;
 	};
 
-	void renderShadowMask();
-	void renderShadowMaskNV();
+	void renderShadowMaskCompute();
+	void renderShadowMaskHardware();
 
 	bool loadModel(const char* filename);
 	GfxRef<GfxTexture> loadTexture(const std::string& filename);

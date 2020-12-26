@@ -22,21 +22,21 @@ set(shaders
 	Shaders/RayTracedShadows.comp
 )
 
-if (USE_NV_RAYTRACING)
+if (USE_VK_RAYTRACING)
 	set(shaders ${shaders}
-		Shaders/RayTracedShadowsNV.rgen
-		Shaders/RayTracedShadowsNV.rmiss
+		Shaders/RayTracedShadows.rgen
+		Shaders/RayTracedShadows.rmiss
 	)
 	target_sources(${app} PRIVATE
-		NVRaytracing.h
-		NVRaytracing.cpp
+		VkRaytracing.h
+		VkRaytracing.cpp
 	)
 	target_compile_definitions(${app} PRIVATE
-		USE_NV_RAYTRACING=1
+		USE_VK_RAYTRACING=1
 	)
 else()
 	target_compile_definitions(${app} PRIVATE
-		USE_NV_RAYTRACING=0
+		USE_VK_RAYTRACING=0
 	)
 endif()
 

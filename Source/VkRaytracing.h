@@ -4,11 +4,11 @@
 
 #include <vector>
 
-class NVRaytracing
+class VkRaytracing
 {
 public:
 
-	~NVRaytracing() { reset(); }
+	~VkRaytracing() { reset(); }
 
 	void createPipeline(const GfxShaderSource& rgen, const GfxShaderSource& rmiss);
 
@@ -32,7 +32,6 @@ public:
 	GfxOwn<GfxBuffer> m_sbtBuffer;
 
 private:
-
 
 	void reset();
 
