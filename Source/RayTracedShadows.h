@@ -18,7 +18,7 @@
 #include "BVHBuilder.h"
 #include "MovingAverage.h"
 
-class NVRaytracing;
+class VkRaytracing;
 
 enum class ShadowRenderMode
 {
@@ -162,10 +162,10 @@ private:
 
 	Vec2 m_prevMousePos = Vec2(0.0f);
 
-#if USE_NV_RAYTRACING
-	NVRaytracing* m_nvRaytracing = nullptr;
-	bool m_nvRaytracingDirty = false;
-#endif // USE_NV_RAYTRACING
+#if USE_VK_RAYTRACING
+	VkRaytracing* m_vkRaytracing = nullptr;
+	bool m_vkRaytracingDirty = false;
+#endif // USE_VK_RAYTRACING
 
 	ShadowRenderMode m_mode = ShadowRenderMode::Compute;
 
