@@ -86,7 +86,8 @@ void VkRaytracing::dispatch(GfxContext* ctx,
 	Gfx_SetSampler(ctx, 0, pointSampler);
 	Gfx_SetTexture(ctx, 0, positionTexture);
 	Gfx_SetStorageImage(ctx, 0, outputShadowMask);
-	Gfx_TraceRays(ctx, m_pipeline, m_tlas, m_sbtBuffer, width, height, 1);
+	Gfx_SetAccelerationStructure(ctx, 0, m_tlas);
+	Gfx_TraceRays(ctx, m_pipeline, m_sbtBuffer, width, height, 1);
 }
 
 void VkRaytracing::reset()

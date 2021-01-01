@@ -26,6 +26,7 @@ if (USE_VK_RAYTRACING)
 	set(shaders ${shaders}
 		Shaders/RayTracedShadows.rgen
 		Shaders/RayTracedShadows.rmiss
+		Shaders/RayTracedShadowsInline.comp
 	)
 	target_sources(${app} PRIVATE
 		VkRaytracing.h
@@ -71,7 +72,7 @@ else()
 	function(shader_compile_rule shaderName dependencies)
 		add_custom_command(
 			OUTPUT ${CMAKE_CFG_INTDIR}/${shaderName}.spv
-			COMMAND ${GLSLC} -o ${CMAKE_CFG_INTDIR}/${shaderName}.spv ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
+			COMMAND ${GLSLC} --target-env=vulkan1.2 -o ${CMAKE_CFG_INTDIR}/${shaderName}.spv ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
 			MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/${shaderName}
 			DEPENDS ${dependencies}
 		)

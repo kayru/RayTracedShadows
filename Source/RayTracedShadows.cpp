@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 
 struct TimingScope
 {
-	TimingScope(MovingAverage<double, 60>& output)
+	TimingScope(MovingAverageBuffer& output)
 		: m_output(output)
 	{}
 
@@ -63,14 +63,14 @@ struct TimingScope
 		m_output.add(m_timer.time());
 	}
 
-	MovingAverage<double, 60>& m_output;
+	MovingAverageBuffer& m_output;
 	Timer m_timer;
 };
 
 RayTracedShadowsApp::RayTracedShadowsApp()
 	: m_boundingBox(Vec3(0.0f), Vec3(0.0f))
 {
-	Gfx_SetPresentInterval(1);
+	Gfx_SetPresentInterval(m_presentInterval);
 
 #if USE_VK_RAYTRACING
 	const GfxCapability& caps = Gfx_GetCapability();
@@ -182,6 +182,20 @@ RayTracedShadowsApp::RayTracedShadowsApp()
 		GfxShaderSource rmiss = shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadows.rmiss"));
 
 		m_vkRaytracing->createPipeline(rgen, rmiss);
+
+		if (caps.rayTracingInline)
+		{
+			GfxOwn<GfxComputeShader> cs;
+			cs = Gfx_CreateComputeShader(shaderFromFile(MAKE_SHADER_NAME("Shaders/RayTracedShadowsInline.comp")));
+
+			GfxShaderBindingDesc bindings;
+			bindings.descriptorSets[0].constantBuffers = 1;
+			bindings.descriptorSets[0].samplers = 1;
+			bindings.descriptorSets[0].textures = 1;
+			bindings.descriptorSets[0].rwImages = 1;
+			bindings.descriptorSets[0].accelerationStructures = 1;
+			m_techniqueRayTracedShadowsInline = Gfx_CreateTechnique(GfxTechniqueDesc(cs.get(), bindings, { 8, 8, 1 }));
+		}
 	}
 #endif // USE_VK_RAYTRACING
 
@@ -271,6 +285,15 @@ void RayTracedShadowsApp::update()
 			{
 				m_mode = ShadowRenderMode::Hardware;
 			}
+			else if (e.code == Key_3)
+			{
+				m_mode = ShadowRenderMode::HardwareInline;
+			}
+			else if (e.code == Key_V)
+			{
+				m_presentInterval = !m_presentInterval;
+				Gfx_SetPresentInterval(m_presentInterval);
+			}
 			break;
 		case WindowEventType_Resize:
 			wantResize = true;
@@ -313,7 +336,6 @@ void RayTracedShadowsApp::update()
 	m_cameraMan.update(&m_camera, dt,
 		m_window->getKeyboardState(),
 		m_window->getMouseState());
-	
 
 	m_interpolatedCamera.blendTo(m_camera, 0.1f, 0.125f);
 
@@ -379,6 +401,7 @@ const char* toString(ShadowRenderMode mode)
 	{
 	case ShadowRenderMode::Compute: return "Compute";
 	case ShadowRenderMode::Hardware: return "Hardware";
+	case ShadowRenderMode::HardwareInline: return "HardwareInline";
 	default:
 		RUSH_BREAK;
 		return "unknown";
@@ -401,7 +424,11 @@ void RayTracedShadowsApp::render()
 	{
 		renderGbuffer();
 
-		if (m_mode == ShadowRenderMode::Hardware)
+		if (m_mode == ShadowRenderMode::HardwareInline)
+		{
+			renderShadowMaskHardwareInline();
+		}
+		else if (m_mode == ShadowRenderMode::Hardware)
 		{
 			renderShadowMaskHardware();
 		}
@@ -454,15 +481,17 @@ void RayTracedShadowsApp::render()
 		char timingString[1024];
 		const GfxStats& stats = Gfx_Stats();
 		sprintf_s(timingString,
+			"VSync: %s\n"
 			"Draw calls: %d\n"
 			"Vertices: %d\n"
 			"Mode: %s\n"
 			"GPU shadows: %.2f ms\n"
-			"mrays / sec: %.4f\n"
+			"MRays / sec: %.4f\n"
 			"GPU total: %.2f ms\n"
 			"CPU time: %.2f ms\n"
 			"> Model: %.2f ms\n"
 			"> UI: %.2f ms",
+			m_presentInterval == 0 ? "OFF" : "ON",
 			stats.drawCalls,
 			stats.vertices,
 			toString(m_mode),
@@ -588,6 +617,39 @@ void RayTracedShadowsApp::renderShadowMaskHardware()
 #endif // USE_VK_RAYTRACING
 
 	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
+}
+
+void RayTracedShadowsApp::renderShadowMaskHardwareInline()
+{
+#if USE_VK_RAYTRACING
+	Gfx_BeginTimer(m_ctx, Timestamp_Shadows);
+
+	if (m_vkRaytracing)
+	{
+		const GfxTextureDesc& desc = Gfx_GetTextureDesc(m_shadowMask);
+
+		RayTracingConstants constants;
+		constants.cameraDirection = Vec4(m_interpolatedCamera.getForward(), 0.0f);
+		constants.lightDirection = Vec4(m_lightCamera.getForward(), 0.0f);
+		constants.cameraPosition = Vec4(m_interpolatedCamera.getPosition(), 0.0f);
+		constants.renderTargetSize = Vec4((float)desc.width, (float)desc.height, 1.0f / desc.width, 1.0f / desc.height);
+		Gfx_UpdateBufferT(m_ctx, m_rayTracingConstantBuffer, constants);
+
+		Gfx_SetConstantBuffer(m_ctx, 0, m_rayTracingConstantBuffer);
+		Gfx_SetSampler(m_ctx, 0, m_samplerStates.pointClamp);
+		Gfx_SetTexture(m_ctx, 0, m_gbufferPosition);
+		Gfx_SetStorageImage(m_ctx, 0, m_shadowMask);
+		Gfx_SetAccelerationStructure(m_ctx, 0, m_vkRaytracing->m_tlas);
+		Gfx_SetTechnique(m_ctx, m_techniqueRayTracedShadowsInline);
+
+		u32 w = divUp(desc.width, 8);
+		u32 h = divUp(desc.height, 8);
+		Gfx_Dispatch(m_ctx, w, h, 1);
+	}
+
+	Gfx_EndTimer(m_ctx, Timestamp_Shadows);
+
+#endif // USE_VK_RAYTRACING
 }
 
 static std::string directoryFromFilename(const std::string& filename)

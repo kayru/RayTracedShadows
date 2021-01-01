@@ -24,7 +24,10 @@ enum class ShadowRenderMode
 {
 	Compute,
 	Hardware,
+	HardwareInline,
 };
+
+using MovingAverageBuffer = MovingAverage<double, 120>;
 
 class RayTracedShadowsApp : public BaseApplication
 {
@@ -60,6 +63,7 @@ private:
 
 	void renderShadowMaskCompute();
 	void renderShadowMaskHardware();
+	void renderShadowMaskHardwareInline();
 
 	bool loadModel(const char* filename);
 	GfxRef<GfxTexture> loadTexture(const std::string& filename);
@@ -68,12 +72,12 @@ private:
 
 	struct Stats
 	{
-		MovingAverage<double, 60> gpuGbuffer;
-		MovingAverage<double, 60> gpuShadows;
-		MovingAverage<double, 60> gpuTotal;
-		MovingAverage<double, 60> cpuTotal;
-		MovingAverage<double, 60> cpuUI;
-		MovingAverage<double, 60> cpuModel;
+		MovingAverageBuffer gpuGbuffer;
+		MovingAverageBuffer gpuShadows;
+		MovingAverageBuffer gpuTotal;
+		MovingAverageBuffer cpuTotal;
+		MovingAverageBuffer cpuUI;
+		MovingAverageBuffer cpuModel;
 	} m_stats;
 
 	Camera m_camera;
@@ -84,6 +88,7 @@ private:
 
 	GfxOwn<GfxTechnique> m_techniqueModel;
 	GfxOwn<GfxTechnique> m_techniqueRayTracedShadows;
+	GfxOwn<GfxTechnique> m_techniqueRayTracedShadowsInline;
 	GfxOwn<GfxTechnique> m_techniqueCombine;
 
 	GfxOwn<GfxTexture> m_defaultWhiteTexture;
@@ -168,5 +173,5 @@ private:
 #endif // USE_VK_RAYTRACING
 
 	ShadowRenderMode m_mode = ShadowRenderMode::Compute;
-
+	u32 m_presentInterval = 1;
 };

@@ -1,5 +1,5 @@
 #version 460
-#extension GL_EXT_ray_tracing : enable
+#extension GL_EXT_ray_query   : enable
 
 layout (binding = 0) uniform Constants
 {
@@ -15,8 +15,6 @@ layout(binding = 3, r8) uniform image2D outputShadowMask;
 
 layout(set=0, binding = 4) uniform accelerationStructureEXT TLAS;
 
-layout(location = 0) rayPayloadEXT uint payload;
-
 float computeEpsilonForValue(float f, uint exponentDiff)
 {
 	uint u = floatBitsToUint(f);
@@ -31,9 +29,10 @@ float max3(vec3 v)
 	return max(max(v.x, v.y), v.z);
 }
 
+layout(local_size_x = 8, local_size_y = 8) in;
 void main()
 {
-	ivec2 pixelIndex = ivec2(gl_LaunchIDEXT.xy);
+	ivec2 pixelIndex = ivec2(gl_GlobalInvocationID.xy);
 
 	vec3 direction = lightDirection.xyz;
 	vec3 cameraRelativePosition = texelFetch(sampler2D(gbufferPositionTexture, defaultSampler), pixelIndex, 0).xyz;
@@ -44,23 +43,24 @@ void main()
 		computeEpsilonForValue(max3(abs(origin)), 13),
 		computeEpsilonForValue(max3(abs(cameraRelativePosition)), 13));
 
-	uint rayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+	uint rayFlags = gl_RayFlagsOpaqueNV | gl_RayFlagsTerminateOnFirstHitNV;
 
-	payload = 0;
-
-	traceRayEXT(TLAS,
-		rayFlags,		// uint rayFlags
-		~0u, 			// uint cullMask
-		0u,	 			// uint sbtRecordOffset
-		0u, 			// uint sbtRecordStride
-		0u,				// uint missIndex
-		origin,			// vec3 origin
-		shadowRayBias,	// float Tmin
-		direction,		// vec3 direction
-		1e9,			// float Tmax
-		0				// int payload
+	rayQueryEXT rayQuery;
+	rayQueryInitializeEXT(rayQuery, 
+		TLAS,
+		rayFlags,       // uint rayFlags
+		~0u,            // uint cullMask
+		origin,         // vec3 origin
+		shadowRayBias,  // float Tmin
+		direction,      // vec3 direction
+		1e9             // float Tmax
 	);
 
+	rayQueryProceedEXT(rayQuery);
+	uint IntersectionType = rayQueryGetIntersectionTypeEXT(rayQuery, true);
+	int payload = IntersectionType == gl_RayQueryCommittedIntersectionNoneEXT ? 1 : 0;
+
 	ivec4 result = ivec4(payload);
+
 	imageStore(outputShadowMask, pixelIndex, result);
 }
